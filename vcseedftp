@@ -5,6 +5,7 @@
 #
 
 import os
+import sys
 import subprocess
 import tempfile
 import ConfigParser
@@ -13,8 +14,16 @@ import ConfigParser
 SELF = os.path.realpath( __file__ )
 ROOT = os.path.dirname( SELF )
 
-settings_file = os.path.join( ROOT, "vcseedftp.ini")
 
+if sys.argv.__len__() == 1:
+	# 預設是讀取專案目錄下的 vcseedftp.ini
+	settings_file = os.path.join( ROOT, "vcseedftp.ini")
+elif sys.argv.__len__() == 2:
+	# 若有指定 *.ini 檔，則用指定的設定檔
+	settings_file = os.path.realpath( sys.argv[1] )
+else:
+	settings_file = None
+	
 if os.access( settings_file, os.R_OK ):
         config = ConfigParser.RawConfigParser()
         config.read(settings_file)
