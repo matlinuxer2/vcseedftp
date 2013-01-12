@@ -6,6 +6,8 @@ run:
 	for ini in `find . -type f -name '*.ini'`; do ./vcseedftp $$ini; done
 
 cron:
-	echo -e "`crontab -l|grep -v vcseedftp`\n0 * * * * cd `pwd`; make update;"| crontab - 
+	crontab -l | sed -e '/vcseedftp/d' > cron.txt 
+	echo "0 * * * * cd `pwd`; make update;" >> cron.txt
+	cat cron.txt | crontab - 
 	crontab -l
-
+	rm -v cron.txt
