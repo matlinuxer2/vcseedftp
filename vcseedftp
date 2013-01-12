@@ -1,0 +1,150 @@
+#!/usr/bin/env python
+#encoding: utf8
+#
+# Copyright: Chun-Yu Lee (Mat) <matlinuxer2@gmail.com> || Dieter Hsu <dieterplex@gmail.com>
+#
+
+import os
+import subprocess
+import tempfile
+import ConfigParser
+
+
+SELF = os.path.realpath( __file__ )
+ROOT = os.path.dirname( SELF )
+
+settings_file = os.path.join( ROOT, "vcseedftp.ini")
+
+if os.access( settings_file, os.R_OK ):
+        config = ConfigParser.RawConfigParser()
+        config.read(settings_file)
+else:
+	print "設定檔無法讀取: ", settings_file
+	exit()
+
+HOST     = config.get('lftp', 'HOST')
+USER     = config.get('lftp', 'USER')
+PASS     = config.get('lftp', 'PASS')
+LCD      = config.get('lftp', 'LCD')
+RCD      = config.get('lftp', 'RCD')
+
+EXCLUDES = " ".join([
+		"--exclude \.hg",
+		"--exclude \.hgignore",
+		"--exclude \.git",
+		"--exclude \.gitignore",
+		"--exclude UploadFile",
+		])
+
+print "HOST: ", HOST
+print "USER: ", USER
+print "PASS: ", PASS
+print "LCD : ", LCD
+print "RCD : ", RCD
+
+def file2string(path):
+	result = ""
+	f = open(path)
+	for line in f:
+	    result += line
+
+	f.close()
+
+	return result
+
+
+def string2file(string, path):
+	f = open(path, 'w')
+	f.write(string)
+	f.close()
+
+
+def do_ftp_download():
+	script_file = tempfile.mktemp()
+	script_stdout = script_file + ".log"
+	script_stderr = script_file + ".err"
+
+	script_tmpl = """
+	debug 1
+	set ftp:list-options -a;
+	set ftp:ssl-allow no;
+	set ftp:passive-mode no;
+	open ftp://%s:%s@%s || exit; 
+	lcd %s || exit;
+	cd %s  || exit;
+	mirror --delete --verbose --parallel=3 %s ;
+	""" 
+	
+	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES )
+	string2file( script_txt, script_file )
+
+	cmd = "lftp -f %s" % ( script_file )
+	proc = subprocess.Popen([ cmd ], shell=True, stdout=file( script_stdout, "w+"), stderr=file( script_stderr, "w+") )      
+
+	print cmd
+	print script_txt
+	print "tail -f ",script_stdout
+	print "tail -f ",script_stderr
+
+	retcode = proc.wait();
+
+	print "return code: ", retcode
+
+def do_vcs_check():
+	check1 = False
+	check2 = False
+
+	if os.access( LCD, os.R_OK | os.W_OK | os.X_OK ):
+		check1 = True
+
+	if os.access( os.path.join( LCD, ".git" ), os.R_OK | os.W_OK | os.X_OK ):
+		check2 = True	
+
+	if check1 and check2:
+		return 0
+
+	elif check1 != True:
+		return 1
+	elif check2 != True:
+		return 2
+	else:
+		return 3
+
+def do_vcs_init():
+	path_orig = os.getcwd()
+	os.chdir( LCD )
+
+	cmd = "git init"
+	proc = subprocess.Popen([ cmd ], shell=True )
+	proc.wait()
+
+	os.chdir( path_orig )
+
+def do_vcs_commit():
+	ret = do_vcs_check()
+	if ret == 1:
+		print "本地端目錄存取有誤: ", LCD 
+		exit()
+	elif ret == 2:
+		do_vcs_init()
+
+	path_orig = os.getcwd()
+	os.chdir( LCD )
+
+	cmd = "git ls-files -d -z | xargs -0 git rm"
+	proc = subprocess.Popen([ cmd ], shell=True )
+	proc.wait()
+
+	cmd = "git ls-files -o -z | xargs -0 git add"
+	proc = subprocess.Popen([ cmd ], shell=True )
+	proc.wait()
+
+	cmd = "git commit -a -m \"* commit by vcseedftp\" "
+	proc = subprocess.Popen([ cmd ], shell=True )
+	proc.wait()
+
+	os.chdir( path_orig )
+
+if __name__ == "__main__":
+	do_ftp_download()
+	do_vcs_commit()
