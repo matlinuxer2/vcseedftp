@@ -13,6 +13,9 @@ cron:
 	crontab -l
 	rm -v cron.txt
 
+mkdir:
+	for x in `grep LCD *.ini | awk '{print $3}'`;do install -d $$x;done
+
 kill:
 	ps aux | grep vcseedftp | grep run | grep -v 'grep' | awk '{print $$2}' | xargs kill
 	ps aux | grep 'lftp -f /tmp/tmp'   | grep -v 'grep' | awk '{print $$2}' | xargs kill
