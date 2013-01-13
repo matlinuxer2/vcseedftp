@@ -42,7 +42,8 @@ EXCLUDES = " ".join([
 		"--exclude \.hgignore",
 		"--exclude \.git",
 		"--exclude \.gitignore",
-		"--exclude UploadFile",
+		"--exclude UploadFile/.*/ ",
+		"--exclude templates/.*/templates_c/ ",
 		])
 
 print "HOST: ", HOST
