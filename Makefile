@@ -11,3 +11,6 @@ cron:
 	cat cron.txt | crontab - 
 	crontab -l
 	rm -v cron.txt
+
+mkdir:
+	for x in `grep LCD *.ini | awk '{print $3}'`;do install -d $$x;done
