@@ -42,6 +42,7 @@ EXCLUDES = " ".join([
 		"--exclude \.hgignore",
 		"--exclude \.git",
 		"--exclude \.gitignore",
+		"--exclude error_log",
 		"--exclude UploadFile/.*/ ",
 		"--exclude templates/.*/templates_c/ ",
 		])
