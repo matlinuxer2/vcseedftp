@@ -2,7 +2,7 @@ update:
 	git pull; git push -f ; 
 
 run:
-	ps aux | grep 'vcseedftp' | grep -v 'grep' | grep -v '/bin/sh -c cd' || for ini in `find . -type f -name '*.ini'`; do ./vcseedftp $$ini; done
+	ps aux | grep 'vcseedftp' | grep -v 'grep' | grep -v '/bin/sh -c cd' || for ini in `find . -type f -name '*.ini' | sort `; do ./vcseedftp $$ini; done
 
 cron:
 	make update
