@@ -7,7 +7,7 @@ run:
 cron:
 	make update
 	crontab -l | sed -e '/vcseedftp/d' > cron.txt 
-	echo "0 * * * * cd `pwd`; make update; make cron; make run;" >> cron.txt
+	echo "0,30 * * * * cd `pwd`; make run; make cron; " >> cron.txt
 	cat cron.txt | crontab - 
 	crontab -l
 	rm -v cron.txt
