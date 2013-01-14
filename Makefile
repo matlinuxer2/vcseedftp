@@ -2,12 +2,12 @@ update:
 	git pull; git push -f ; 
 
 run:
-	ps aux | grep 'vcseedftp' | grep -v 'grep' || for ini in `find . -type f -name '*.ini'`; do ./vcseedftp $$ini; done
+	ps aux | grep 'vcseedftp' | grep -v 'grep' | grep -v '/bin/sh -c cd' || for ini in `find . -type f -name '*.ini'`; do ./vcseedftp $$ini; done
 
 cron:
 	make update
 	crontab -l | sed -e '/vcseedftp/d' > cron.txt 
-	echo "0,30 * * * * cd `pwd`; make run; make cron; " >> cron.txt
+	echo "*/30 * * * * cd `pwd`; make run; make cron; " >> cron.txt
 	cat cron.txt | crontab - 
 	crontab -l
 	rm -v cron.txt
