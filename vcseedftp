@@ -153,7 +153,7 @@ def do_vcs_commit():
 	proc = subprocess.Popen([ cmd ], shell=True )
 	proc.wait()
 
-	cmd = "git commit -a -m \"* commit by vcseedftp\" "
+	cmd = "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -a -m \"*\" "
 	proc = subprocess.Popen([ cmd ], shell=True )
 	proc.wait()
 
