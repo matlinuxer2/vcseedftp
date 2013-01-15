@@ -79,11 +79,10 @@ def do_ftp_download():
 	debug 1
 	set ftp:list-options -a;
 	set ftp:ssl-allow no;
-	set ftp:passive-mode no;
 	open ftp://%s:%s@%s || exit; 
 	lcd %s || exit;
 	cd %s  || exit;
-	mirror --delete --verbose --parallel=1 %s ;
+	mirror --delete --verbose --parallel=3 %s ;
 	""" 
 	
 	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES )
