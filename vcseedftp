@@ -8,7 +8,10 @@ import os
 import sys
 import subprocess
 import tempfile
-import ConfigParser
+try:
+	import ConfigParser
+except ImportError:
+	import configparser as ConfigParser
 
 
 SELF = os.path.realpath( __file__ )
@@ -25,10 +28,10 @@ else:
 	settings_file = None
 	
 if os.access( settings_file, os.R_OK ):
-        config = ConfigParser.RawConfigParser()
-        config.read(settings_file)
+		config = ConfigParser.RawConfigParser()
+		config.read(settings_file)
 else:
-	print "設定檔無法讀取: ", settings_file
+	print("設定檔無法讀取: ", settings_file)
 	exit()
 
 HOST     = config.get('lftp', 'HOST')
@@ -47,11 +50,11 @@ EXCLUDES = " ".join([
 		"--exclude templates/.*/templates_c/ ",
 		])
 
-print "HOST: ", HOST
-print "USER: ", USER
-print "PASS: ", PASS
-print "LCD : ", LCD
-print "RCD : ", RCD
+print("HOST: ", HOST)
+print("USER: ", USER)
+print("PASS: ", PASS)
+print("LCD : ", LCD)
+print("RCD : ", RCD)
 
 def file2string(path):
 	result = ""
@@ -89,16 +92,16 @@ def do_ftp_download():
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
-	proc = subprocess.Popen([ cmd ], shell=True, stdout=file( script_stdout, "w+"), stderr=file( script_stderr, "w+") )      
+	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )      
 
-	print cmd
-	print script_txt
-	print "tail -f ",script_stdout
-	print "tail -f ",script_stderr
+	print(cmd)
+	print(script_txt)
+	print("tail -f ",script_stdout)
+	print("tail -f ",script_stderr)
 
 	retcode = proc.wait();
 
-	print "return code: ", retcode
+	print("return code: ", retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
@@ -136,7 +139,7 @@ def do_vcs_init():
 def do_vcs_commit():
 	ret = do_vcs_check()
 	if ret == 1:
-		print "本地端目錄存取有誤: ", LCD 
+		print("本地端目錄存取有誤: ", LCD)
 		exit()
 	elif ret == 2:
 		do_vcs_init()
