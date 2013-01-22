@@ -36,22 +36,33 @@ USER     = config.get('lftp', 'USER')
 PASS     = config.get('lftp', 'PASS')
 LCD      = config.get('lftp', 'LCD')
 RCD      = config.get('lftp', 'RCD')
+EXCL     = []
+if config.has_option( 'lftp', 'EXCL' ):
+	EXCL = config.get('lftp', 'EXCL').split('\n')
 
-EXCLUDES = " ".join([
-		"--exclude \.hg",
-		"--exclude \.hgignore",
-		"--exclude \.git",
-		"--exclude \.gitignore",
-		"--exclude error_log",
-		"--exclude UploadFile/.*/ ",
-		"--exclude templates/.*/templates_c/ ",
-		])
+EXCL += [
+	"\.hg",
+	"\.hgignore",
+	"\.git",
+	"\.gitignore",
+	"error_log",
+	"UploadFile/.*/",
+	"templates/.*/templates_c/",
+	]
+
+for i in range( 0, EXCL.__len__() -1 ):
+	val = EXCL[i].strip()
+	if val != "":
+		EXCL[i] = "--exclude "+EXCL[i]
+
+EXCLUDES = " ".join( EXCL )
 
 print "HOST: ", HOST
 print "USER: ", USER
 print "PASS: ", PASS
 print "LCD : ", LCD
 print "RCD : ", RCD
+print "EXCL: ", EXCL
 
 def file2string(path):
 	result = ""
