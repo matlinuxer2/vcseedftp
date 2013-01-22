@@ -50,7 +50,7 @@ EXCL += [
 	"templates/.*/templates_c/",
 	]
 
-for i in range( 0, EXCL.__len__() -1 ):
+for i in range( 0, EXCL.__len__() ):
 	val = EXCL[i].strip()
 	if val != "":
 		EXCL[i] = "--exclude "+EXCL[i]
