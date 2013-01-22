@@ -56,6 +56,17 @@ print("PASS: ", PASS)
 print("LCD : ", LCD)
 print("RCD : ", RCD)
 
+
+class MergeFailException(Exception): pass
+class AddChangsFailException(Exception): pass
+
+
+def _popen(cmd):
+	"""operations from LCD"""
+	pipe = subprocess.Popen([ cmd ], shell=True, cwd=LCD, stdout = subprocess.PIPE, stderr = subprocess.PIPE )
+	(out, error) = pipe.communicate()
+	return pipe.wait(), out, error
+
 def file2string(path):
 	result = ""
 	f = open(path)
@@ -144,23 +155,26 @@ def do_vcs_commit():
 	elif ret == 2:
 		do_vcs_init()
 
-	path_orig = os.getcwd()
-	os.chdir( LCD )
-
-	cmd = "git ls-files -d -z | xargs -0 git rm"
-	proc = subprocess.Popen([ cmd ], shell=True )
-	proc.wait()
-
-	cmd = "git ls-files -o -z | xargs -0 git add"
-	proc = subprocess.Popen([ cmd ], shell=True )
-	proc.wait()
+	cmd = "git add --all"
+	(retcode, out, error) = _popen(cmd)
+	if retcode == 1:
+		raise AddChangesFailException("加入更動檔案時失敗")
 
 	cmd = "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -a -m \"*\" "
-	proc = subprocess.Popen([ cmd ], shell=True )
-	proc.wait()
+	_popen(cmd)
 
-	os.chdir( path_orig )
+def do_vcs_merge():
+	"""merge `for_merge' branch to master branch"""
+	cmd = "git merge for_merge"
+	retcode = _popen(cmd)
+	if retcode != 0:
+		raise MergeFailException()
+
+def do_ftp_upload():
+	pass
 
 if __name__ == "__main__":
 	do_ftp_download()
 	do_vcs_commit()
+	#do_vcs_merge()
+	#do_ftp_upload()
