@@ -170,8 +170,40 @@ def do_vcs_commit():
 	cmd = "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -a -m \"*\" "
 	_popen(cmd)
 
+def check_vcs_mergefailed( lcd, hash_for_merge ):
+
+	cmd = "cat ~/.vcseedftp-mergefail.log | grep '%s\t%s' " % ( lcd, hash_for_merge )
+	retcode, out, err = _popen(cmd)
+	if retcode == 0:
+		hash_intersect = out.strip()
+
 def check_vcs_incomming():
-	pass
+
+	hash_for_merge = "" # branch == "for_merge" 的 hash
+	hash_intersect = "" # "for_merge" 跟 "master" 分支共同交集的 hash
+
+	cmd = "git branch -v | cut -c3- | grep 'for_merge'| awk '{print $2}'"
+	retcode, out, err = _popen(cmd)
+	if retcode == 0:
+		hash_for_merge = out.strip()
+
+	cmd = "git merge-base master for_merge | cut -c1-7"
+	retcode, out, err = _popen(cmd)
+	if retcode == 0:
+		hash_intersect = out.strip()
+
+	print ( ">>> for_merge = '%s', intersect='%s' " % (hash_for_merge, hash_intersect) ) 
+
+	if hash_intersect != hash_for_merge and hash_for_merge != "" and hash_intersect != "":
+		if check_vcs_mergefailed( LCD, hash_for_merge ):
+			print ( ">>> Changeset %s of for_merge 曾經 merge failed, 跳過 merge" )
+			return False
+		else:
+			return True
+	else:
+		if hash_intersect == hash_for_merge:
+			print ( ">>> for_merge 的 HEAD 已在 master 的 changesets 裡，不需要再 merge " )
+		return False
 
 def do_vcs_merge():
 	"""merge `for_merge' branch to master branch"""
@@ -213,8 +245,10 @@ def do_ftp_upload():
 
 
 if __name__ == "__main__":
-	do_ftp_download()
-	do_vcs_commit()
+	#do_ftp_download()
+	#do_vcs_commit()
 	if check_vcs_incomming():
+		print ( "進行 merge ..." )
+		exit()
 		do_vcs_merge()
 		do_ftp_upload()
