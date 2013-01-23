@@ -28,8 +28,8 @@ else:
 	settings_file = None
 	
 if os.access( settings_file, os.R_OK ):
-        config = ConfigParser.RawConfigParser()
-        config.read(settings_file)
+		config = ConfigParser.RawConfigParser()
+		config.read(settings_file)
 else:
 	print("設定檔無法讀取: ", settings_file)
 	exit()
@@ -60,12 +60,12 @@ for i in range( 0, EXCL.__len__() ):
 
 EXCLUDES = " ".join( EXCL )
 
-print "HOST: ", HOST
-print "USER: ", USER
-print "PASS: ", PASS
-print "LCD : ", LCD
-print "RCD : ", RCD
-print "EXCL: ", EXCL
+print("HOST: ", HOST)
+print("USER: ", USER)
+print("PASS: ", PASS)
+print("LCD : ", LCD)
+print("RCD : ", RCD)
+print("EXCL: ", EXCL)
 
 class MergeFailException(Exception): pass
 class AddChangsFailException(Exception): pass
@@ -74,13 +74,15 @@ def _popen(cmd):
 	"""operations from LCD"""
 	pipe = subprocess.Popen([ cmd ], shell=True, cwd=LCD, stdout = subprocess.PIPE, stderr = subprocess.PIPE )
 	(out, error) = pipe.communicate()
+	print(out)
+	print(error)
 	return pipe.wait(), out, error
 
 def file2string(path):
 	result = ""
 	f = open(path)
 	for line in f:
-	    result += line
+		result += line
 
 	f.close()
 
@@ -112,7 +114,7 @@ def do_ftp_download():
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
-	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )      
+	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )
 
 	print(cmd)
 	print(script_txt)
@@ -207,18 +209,18 @@ def check_vcs_incomming():
 
 def do_vcs_merge():
 	"""merge `for_merge' branch to master branch"""
-    # get for_merge commit hash
-    cmd = "git branch -v | awk '{print $3}'"
-    (retcode, out, error) = _popen(cmd)
-    for_merge_hash = out
+	# get for_merge commit hash
+	cmd = "git branch -v | awk '{print $3}'"
+	(retcode, out, error) = _popen(cmd)
+	for_merge_hash = out
 
 	cmd = "git merge for_merge"
-    (retcode, out, error) = _popen(cmd)
+	(retcode, out, error) = _popen(cmd)
 	if retcode != 0:
-        cmd = "git reset --hard ; git clean -df ;"
-              "echo %s\t%s >> ~/.vcssedftp-mergefail.log"
-              % (LCD, for_merge_hash)
-        _popen(cmd)
+		cmd = "git reset --hard ; git clean -df ; \
+				echo %s\t%s >> ~/.vcssedftp-mergefail.log" \
+				% (LCD, for_merge_hash)
+		_popen(cmd)
 		raise MergeFailException()
 
 def do_ftp_upload():
@@ -240,7 +242,7 @@ def do_ftp_upload():
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
-	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )      
+	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )
 
 	print(cmd)
 	print(script_txt)
