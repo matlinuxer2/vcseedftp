@@ -116,8 +116,6 @@ def do_ftp_download():
 
 	print(cmd)
 	print(script_txt)
-	print("tail -f ",script_stdout)
-	print("tail -f ",script_stderr)
 
 	retcode = proc.wait();
 
