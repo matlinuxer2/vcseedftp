@@ -170,6 +170,9 @@ def do_vcs_commit():
 	cmd = "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -a -m \"*\" "
 	_popen(cmd)
 
+def check_vcs_incomming():
+	pass
+
 def do_vcs_merge():
 	"""merge `for_merge' branch to master branch"""
 	cmd = "git merge for_merge"
@@ -189,7 +192,7 @@ def do_ftp_upload():
 	open ftp://%s:%s@%s || exit; 
 	lcd %s || exit;
 	cd %s  || exit;
-	mirror --reverse --delete --verbose --parallel=3 %s ;
+	mirror --reverse --dry-run --delete --verbose --parallel=3 %s ;
 	""" 
 	
 	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES )
@@ -212,5 +215,6 @@ def do_ftp_upload():
 if __name__ == "__main__":
 	do_ftp_download()
 	do_vcs_commit()
-	#do_vcs_merge()
-	#do_ftp_upload()
+	if check_vcs_incomming():
+		do_vcs_merge()
+		do_ftp_upload()
