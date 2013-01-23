@@ -209,6 +209,11 @@ def check_vcs_incomming():
 
 def do_vcs_merge():
 	"""merge `for_merge' branch to master branch"""
+
+	# get for_merge commit hash
+	cmd = "git branch -v | cut -c3- | awk '{print $2}'"
+	(retcode, out, error) = _popen(cmd)
+	for_merge_hash = out
 	# get for_merge commit hash
 	cmd = "git branch -v | awk '{print $3}'"
 	(retcode, out, error) = _popen(cmd)
