@@ -8,7 +8,10 @@ import os
 import sys
 import subprocess
 import tempfile
-import ConfigParser
+try:
+	import ConfigParser
+except ImportError:
+	import configparser as ConfigParser
 
 
 SELF = os.path.realpath( __file__ )
@@ -28,7 +31,7 @@ if os.access( settings_file, os.R_OK ):
         config = ConfigParser.RawConfigParser()
         config.read(settings_file)
 else:
-	print "設定檔無法讀取: ", settings_file
+	print("設定檔無法讀取: ", settings_file)
 	exit()
 
 HOST     = config.get('lftp', 'HOST')
@@ -63,6 +66,15 @@ print "PASS: ", PASS
 print "LCD : ", LCD
 print "RCD : ", RCD
 print "EXCL: ", EXCL
+
+class MergeFailException(Exception): pass
+class AddChangsFailException(Exception): pass
+
+def _popen(cmd):
+	"""operations from LCD"""
+	pipe = subprocess.Popen([ cmd ], shell=True, cwd=LCD, stdout = subprocess.PIPE, stderr = subprocess.PIPE )
+	(out, error) = pipe.communicate()
+	return pipe.wait(), out, error
 
 def file2string(path):
 	result = ""
@@ -100,16 +112,16 @@ def do_ftp_download():
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
-	proc = subprocess.Popen([ cmd ], shell=True, stdout=file( script_stdout, "w+"), stderr=file( script_stderr, "w+") )      
+	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )      
 
-	print cmd
-	print script_txt
-	print "tail -f ",script_stdout
-	print "tail -f ",script_stderr
+	print(cmd)
+	print(script_txt)
+	print("tail -f ",script_stdout)
+	print("tail -f ",script_stderr)
 
 	retcode = proc.wait();
 
-	print "return code: ", retcode
+	print("return code: ", retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
@@ -147,28 +159,31 @@ def do_vcs_init():
 def do_vcs_commit():
 	ret = do_vcs_check()
 	if ret == 1:
-		print "本地端目錄存取有誤: ", LCD 
+		print("本地端目錄存取有誤: ", LCD)
 		exit()
 	elif ret == 2:
 		do_vcs_init()
 
-	path_orig = os.getcwd()
-	os.chdir( LCD )
-
-	cmd = "git ls-files -d -z | xargs -0 git rm"
-	proc = subprocess.Popen([ cmd ], shell=True )
-	proc.wait()
-
-	cmd = "git ls-files -o -z | xargs -0 git add"
-	proc = subprocess.Popen([ cmd ], shell=True )
-	proc.wait()
+	cmd = "git add --all"
+	(retcode, out, error) = _popen(cmd)
+	if retcode == 1:
+		raise AddChangesFailException("加入更動檔案時失敗")
 
 	cmd = "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -a -m \"*\" "
-	proc = subprocess.Popen([ cmd ], shell=True )
-	proc.wait()
+	_popen(cmd)
 
-	os.chdir( path_orig )
+def do_vcs_merge():
+	"""merge `for_merge' branch to master branch"""
+	cmd = "git merge for_merge"
+	retcode = _popen(cmd)
+	if retcode != 0:
+		raise MergeFailException()
+
+def do_ftp_upload():
+	pass
 
 if __name__ == "__main__":
 	do_ftp_download()
 	do_vcs_commit()
+	#do_vcs_merge()
+	#do_ftp_upload()
