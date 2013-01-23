@@ -175,10 +175,13 @@ def do_vcs_commit():
 
 def check_vcs_mergefailed( lcd, hash_for_merge ):
 
-	cmd = "cat ~/.vcseedftp-mergefail.log | grep '%s\t%s' " % ( lcd, hash_for_merge )
+	cmd = "cat ~/.vcseedftp-mergefail.log | grep \"%s\t%s\" " % ( lcd, hash_for_merge )
 	retcode, out, err = _popen(cmd)
 	if retcode == 0:
 		hash_intersect = out.strip()
+		return True
+	else:
+		return False
 
 def check_vcs_incomming():
 
@@ -188,12 +191,12 @@ def check_vcs_incomming():
 	cmd = "git branch -v | cut -c3- | grep 'for_merge'| awk '{print $2}'"
 	retcode, out, err = _popen(cmd)
 	if retcode == 0:
-		hash_for_merge = out.strip()
+		hash_for_merge = out.decode().strip()
 
 	cmd = "git merge-base master for_merge | cut -c1-7"
 	retcode, out, err = _popen(cmd)
 	if retcode == 0:
-		hash_intersect = out.strip()
+		hash_intersect = out.decode().strip()
 
 	print ( ">>> for_merge = '%s', intersect='%s' " % (hash_for_merge, hash_intersect) ) 
 
@@ -216,9 +219,12 @@ def do_vcs_merge():
 	if retcode != 0:
 		# get for_merge commit hash
 		cmd = "git branch -v | cut -c3- | grep 'for_merge' | awk '{print $2}'"
-		_, for_merge_hash, _ = _popen(cmd)
+		_, out, _ = _popen(cmd)
+		for_merge_hash = out.decode().strip() # byte -> str -> no newline
+
+		print("Merge 失敗, 恢復資料中...")
 		cmd = "git reset --hard ; git clean -df ; \
-				echo %s\t%s >> ~/.vcssedftp-mergefail.log" \
+				echo \"%s\t%s\" >> ~/.vcseedftp-mergefail.log" \
 				% (LCD, for_merge_hash)
 		_popen(cmd)
 		raise MergeFailException()
