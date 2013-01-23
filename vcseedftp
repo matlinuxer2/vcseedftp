@@ -207,9 +207,18 @@ def check_vcs_incomming():
 
 def do_vcs_merge():
 	"""merge `for_merge' branch to master branch"""
+    # get for_merge commit hash
+    cmd = "git branch -v | awk '{print $3}'"
+    (retcode, out, error) = _popen(cmd)
+    for_merge_hash = out
+
 	cmd = "git merge for_merge"
-	retcode = _popen(cmd)
+    (retcode, out, error) = _popen(cmd)
 	if retcode != 0:
+        cmd = "git reset --hard ; git clean -df ;"
+              "echo %s\t%s >> ~/.vcssedftp-mergefail.log"
+              % (LCD, for_merge_hash)
+        _popen(cmd)
 		raise MergeFailException()
 
 def do_ftp_upload():
