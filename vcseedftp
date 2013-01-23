@@ -178,7 +178,36 @@ def do_vcs_merge():
 		raise MergeFailException()
 
 def do_ftp_upload():
-	pass
+	script_file = tempfile.mktemp()
+	script_stdout = script_file + ".log"
+	script_stderr = script_file + ".err"
+
+	script_tmpl = """
+	debug 1
+	set ftp:list-options -a;
+	set ftp:ssl-allow no;
+	open ftp://%s:%s@%s || exit; 
+	lcd %s || exit;
+	cd %s  || exit;
+	mirror --reverse --delete --verbose --parallel=3 %s ;
+	""" 
+	
+	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES )
+	string2file( script_txt, script_file )
+
+	cmd = "lftp -f %s" % ( script_file )
+	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )      
+
+	print(cmd)
+	print(script_txt)
+
+	retcode = proc.wait();
+
+	print("return code: ", retcode)
+	os.unlink( script_file )
+	os.unlink( script_stdout )
+	os.unlink( script_stderr )
+
 
 if __name__ == "__main__":
 	do_ftp_download()
