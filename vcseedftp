@@ -200,7 +200,7 @@ def check_vcs_mergefailed( lcd, hash_for_merge ):
 def get_hash_from_branch( br ):
 	result = ""
 
-	cmd = "git branch -v | cut -c3- | awk '{print $1, $2}' | grep '%s'| awk '{print $2}'" % ( br )
+	cmd = "git rev-list --max-count=1 '%s' | cut -c1-7 " % ( br )
 	retcode, out, err = _popen(cmd)
 	if retcode == 0:
 		result = out.decode().strip()
