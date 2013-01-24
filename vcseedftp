@@ -129,6 +129,12 @@ def do_ftp_download():
 
 	return retcode
 
+def do_vcs_goto_branch( br ):
+	cmd = "git checkout --force %s " % ( br )
+	retcode, out, err = _popen(cmd)
+
+	return retcode
+
 def do_vcs_check():
 	check1 = False
 	check2 = False
@@ -230,7 +236,7 @@ def check_vcs_incomming():
 def do_vcs_merge():
 	"""merge `for_merge' branch to master branch"""
 
-	cmd = "git checkout master; git merge for_merge"
+	cmd = "git merge for_merge"
 	(retcode, out, error) = _popen(cmd)
 	if retcode != 0:
 		# get for_merge commit hash
@@ -291,9 +297,9 @@ def do_ftp_upload2( old_rev, new_rev ):
 	script_stderr = script_file + ".err"
 
 	cmd =  "git diff --name-status %s %s" % ( old_rev, new_rev )
-	cmd += "  | sed -e 's/^A\t\(.*\)/put \\1 -O \\1/g' "
+	cmd += "  | sed -e 's/^A\t\(.*\)/put \\1 -o \\1/g' "
 	cmd += "  | sed -e 's/^D\t\(.*\)/rm \\1/g' "
-	cmd += "  | sed -e 's/^M\t\(.*\)/put \\1 -O \\1/g' "
+	cmd += "  | sed -e 's/^M\t\(.*\)/put \\1 -o \\1/g' "
 	retcode, out, err = _popen(cmd)
 	
 	upload_commands_text = out
@@ -332,6 +338,7 @@ def do_ftp_upload2( old_rev, new_rev ):
 	return retcode
 
 if __name__ == "__main__":
+	do_vcs_goto_branch( "master" )
 	do_ftp_download()
 	do_vcs_commit()
 	if check_vcs_incomming():
