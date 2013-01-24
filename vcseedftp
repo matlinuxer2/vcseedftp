@@ -61,12 +61,20 @@ for i in range( 0, EXCL.__len__() ):
 
 EXCLUDES = " ".join( EXCL )
 
+FTP_PUSH = False
+if config.has_section( 'vcseedftp' ) and config.has_option( 'vcseedftp', 'FTP_PUSH' ):
+	ftp_push_str = config.get( 'vcseedftp', 'FTP_PUSH' ).strip().lower()
+	if ftp_push_str == "yes" or ftp_push_str == "true" or ftp_push_str == "enable" or ftp_push_str == "on":
+		FTP_PUSH = True
+	
+
 print("HOST: ", HOST)
 print("USER: ", USER)
 print("PASS: ", PASS)
 print("LCD : ", LCD)
 print("RCD : ", RCD)
 print("EXCL: ", EXCL)
+print("FTP_PUSH: ", FTP_PUSH)
 
 class MergeFailException(Exception): pass
 class AddChangsFailException(Exception): pass
@@ -383,7 +391,7 @@ if __name__ == "__main__":
 	do_ftp_download()
 	do_vcs_commit()
 
-	if check_vcs_incomming():
+	if FTP_PUSH and check_vcs_incomming():
 		old_rev = get_hash_from_branch( "master" )
 		print ( "進行 merge ..." )
 		ret = do_vcs_merge()
