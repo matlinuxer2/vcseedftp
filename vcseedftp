@@ -75,8 +75,6 @@ def _popen(cmd):
 	"""operations from LCD"""
 	pipe = subprocess.Popen([ cmd ], shell=True, cwd=LCD, stdout = subprocess.PIPE, stderr = subprocess.PIPE )
 	(out, error) = pipe.communicate()
-	print(out)
-	print(error)
 	return pipe.wait(), out, error
 
 def file2string(path):
@@ -102,7 +100,7 @@ def do_ftp_download():
 	script_stderr = script_file + ".err"
 
 	script_tmpl = """
-	debug 1
+	debug 2
 	set ftp:list-options -a;
 	set ftp:ssl-allow no;
 	open ftp://%s:%s@%s || exit; 
@@ -194,7 +192,7 @@ def check_vcs_mergefailed( lcd, hash_for_merge ):
 def get_hash_from_branch( br ):
 	result = ""
 
-	cmd = "git branch -v | cut -c3- | grep '%s'| awk '{print $2}'" % ( br )
+	cmd = "git branch -v | cut -c3- | awk '{print $1, $2}' | grep '%s'| awk '{print $2}'" % ( br )
 	retcode, out, err = _popen(cmd)
 	if retcode == 0:
 		result = out.decode().strip()
@@ -236,7 +234,7 @@ def check_vcs_incomming():
 def do_vcs_merge():
 	"""merge `for_merge' branch to master branch"""
 
-	cmd = "git merge for_merge"
+	cmd = "git merge --ff-only for_merge"
 	(retcode, out, error) = _popen(cmd)
 	if retcode != 0:
 		# get for_merge commit hash
@@ -258,7 +256,7 @@ def do_ftp_upload():
 	script_stderr = script_file + ".err"
 
 	script_tmpl = """
-	debug 1
+	debug 2
 	set ftp:list-options -a;
 	set ftp:ssl-allow no;
 	open ftp://%s:%s@%s || exit; 
@@ -305,7 +303,7 @@ def do_ftp_upload2( old_rev, new_rev ):
 	upload_commands_text = out
 
 	script_tmpl = """
-	debug 1
+	debug 2
 	set ftp:list-options -a;
 	set ftp:ssl-allow no;
 	open ftp://%s:%s@%s || exit; 
@@ -345,7 +343,7 @@ def do_ftp_sync_check():
 	script_stderr = script_file + ".err"
 
 	script_tmpl = """
-	debug 1
+	debug 2
 	set ftp:list-options -a;
 	set ftp:ssl-allow no;
 	open ftp://%s:%s@%s || exit; 
