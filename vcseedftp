@@ -337,10 +337,55 @@ def do_ftp_upload2( old_rev, new_rev ):
 
 	return retcode
 
+def do_ftp_sync_check():
+	script_file = tempfile.mktemp()
+	script_stdout = script_file + ".log"
+	script_stderr = script_file + ".err"
+
+	script_tmpl = """
+	debug 1
+	set ftp:list-options -a;
+	set ftp:ssl-allow no;
+	open ftp://%s:%s@%s || exit; 
+	lcd %s || exit;
+	cd %s  || exit;
+	mirror --dry-run    --delete --verbose --parallel=1 %s ;
+	mirror --dry-run -R --delete --verbose --parallel=1 %s ;
+	""" 
+	
+	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
+	string2file( script_txt, script_file )
+
+	cmd = "lftp -f %s" % ( script_file )
+	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )
+
+	print(cmd)
+	print(script_txt)
+
+	retcode = proc.wait();
+
+	print("return code: ", retcode)
+
+	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
+	_popen(cmd)
+	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
+	_popen(cmd)
+
+	os.unlink( script_file )
+	os.unlink( script_stdout )
+	os.unlink( script_stderr )
+
+	return retcode
+
 if __name__ == "__main__":
 	do_vcs_goto_branch( "master" )
 	do_ftp_download()
 	do_vcs_commit()
+
+	print ( ">>>> 檢查 ftp sync 狀態 <<<<" )
+	do_ftp_sync_check()
+	print ( ">>>> ================== <<<<" )
+
 	if check_vcs_incomming():
 		old_rev = get_hash_from_branch( "master" )
 		print ( "進行 merge ..." )
@@ -350,3 +395,7 @@ if __name__ == "__main__":
 			#do_ftp_upload()
 			new_rev = get_hash_from_branch( "master" )
 			do_ftp_upload2( old_rev, new_rev )
+
+	print ( ">>>> 檢查 ftp sync 狀態 <<<<" )
+	do_ftp_sync_check()
+	print ( ">>>> ================== <<<<" )
