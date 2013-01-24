@@ -310,7 +310,7 @@ def do_ftp_upload2( old_rev, new_rev ):
 	cmd += "  | sed -e 's/^M\t\(.*\)/put \\1 -o \\1/g' "
 	retcode, out, err = _popen(cmd)
 	
-	upload_commands_text = out
+	upload_commands_text = out.decode()
 
 	script_tmpl = """
 	debug 2
