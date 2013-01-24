@@ -165,7 +165,9 @@ def do_vcs_init():
 	path_orig = os.getcwd()
 	os.chdir( LCD )
 
-	cmd = "git init"
+	cmd = "git init;"
+	cmd += "touch .gitignore; git add .; git commit -m init;"
+	cmd += "git branch for_merge master"
 	proc = subprocess.Popen([ cmd ], shell=True )
 	proc.wait()
 
