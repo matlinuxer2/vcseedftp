@@ -338,6 +338,8 @@ def do_ftp_upload2( old_rev, new_rev ):
 	return retcode
 
 def do_ftp_sync_check():
+	result = -1
+
 	script_file = tempfile.mktemp()
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
@@ -349,8 +351,8 @@ def do_ftp_sync_check():
 	open ftp://%s:%s@%s || exit; 
 	lcd %s || exit;
 	cd %s  || exit;
-	mirror --dry-run    --delete --verbose --parallel=1 %s ;
-	mirror --dry-run -R --delete --verbose --parallel=1 %s ;
+	mirror --dry-run    --delete --verbose --parallel=5 %s ;
+	mirror --dry-run -R --delete --verbose --parallel=5 %s ;
 	""" 
 	
 	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
@@ -366,25 +368,22 @@ def do_ftp_sync_check():
 
 	print("return code: ", retcode)
 
-	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
-	_popen(cmd)
-	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
-	_popen(cmd)
+	difference_complain = file2string( script_stdout )
+	print( "difference_complain: ", difference_complain )
+
+	if retcode == 0 and difference_complain == "":
+		result = 0
 
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
 
-	return retcode
+	return result
 
 if __name__ == "__main__":
 	do_vcs_goto_branch( "master" )
 	do_ftp_download()
 	do_vcs_commit()
-
-	print ( ">>>> 檢查 ftp sync 狀態 <<<<" )
-	do_ftp_sync_check()
-	print ( ">>>> ================== <<<<" )
 
 	if check_vcs_incomming():
 		old_rev = get_hash_from_branch( "master" )
@@ -395,7 +394,10 @@ if __name__ == "__main__":
 			#do_ftp_upload()
 			new_rev = get_hash_from_branch( "master" )
 			do_ftp_upload2( old_rev, new_rev )
-
-	print ( ">>>> 檢查 ftp sync 狀態 <<<<" )
-	do_ftp_sync_check()
-	print ( ">>>> ================== <<<<" )
+			print ( "檢查 local 跟 remote ftp 的檔案是否一致" )
+		
+			ret = do_ftp_sync_check()
+			if ret == 0:
+				print ( ">>> ftp sync 狀態一致 <<<" )
+			else:
+				print ( "!!! local 跟 remote 檔案不一致 !!!" )
