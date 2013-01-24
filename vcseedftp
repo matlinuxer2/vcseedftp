@@ -127,6 +127,8 @@ def do_ftp_download():
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
 
+	return retcode
+
 def do_vcs_check():
 	check1 = False
 	check2 = False
@@ -183,20 +185,34 @@ def check_vcs_mergefailed( lcd, hash_for_merge ):
 	else:
 		return False
 
+def get_hash_from_branch( br ):
+	result = ""
+
+	cmd = "git branch -v | cut -c3- | grep '%s'| awk '{print $2}'" % ( br )
+	retcode, out, err = _popen(cmd)
+	if retcode == 0:
+		result = out.decode().strip()
+
+	return result
+
+def get_base_hash_from_branches( br1, br2 ):
+	result = ""
+
+	cmd = "git merge-base %s %s | cut -c1-7" % ( br1, br2 )
+	retcode, out, err = _popen(cmd)
+	if retcode == 0:
+		result = out.decode().strip()
+
+	return result
+	
+
 def check_vcs_incomming():
 
 	hash_for_merge = "" # branch == "for_merge" 的 hash
 	hash_intersect = "" # "for_merge" 跟 "master" 分支共同交集的 hash
 
-	cmd = "git branch -v | cut -c3- | grep 'for_merge'| awk '{print $2}'"
-	retcode, out, err = _popen(cmd)
-	if retcode == 0:
-		hash_for_merge = out.decode().strip()
-
-	cmd = "git merge-base master for_merge | cut -c1-7"
-	retcode, out, err = _popen(cmd)
-	if retcode == 0:
-		hash_intersect = out.decode().strip()
+	hash_for_merge = get_hash_from_branch( "for_merge" )
+	hash_intersect = get_base_hash_from_branches( "master", "for_merge" )
 
 	print ( ">>> for_merge = '%s', intersect='%s' " % (hash_for_merge, hash_intersect) ) 
 
@@ -218,16 +234,17 @@ def do_vcs_merge():
 	(retcode, out, error) = _popen(cmd)
 	if retcode != 0:
 		# get for_merge commit hash
-		cmd = "git branch -v | cut -c3- | grep 'for_merge' | awk '{print $2}'"
-		_, out, _ = _popen(cmd)
-		for_merge_hash = out.decode().strip() # byte -> str -> no newline
+		for_merge_hash = get_hash_from_branch( "for_merge" )
 
 		print("Merge 失敗, 恢復資料中...")
-		cmd = "git reset --hard ; git clean -df ; \
-				echo \"%s\t%s\" >> ~/.vcseedftp-mergefail.log" \
-				% (LCD, for_merge_hash)
+		cmd =  "git reset --hard;"
+		#cmd += "git clean -df;" # 先不能執行 git clean, 不然 mirror --delete --reverse 會刪掉某些 untrack 的資料目錄
+		cmd += "echo \"%s\t%s\" >> ~/.vcseedftp-mergefail.log" % (LCD, for_merge_hash)
 		_popen(cmd)
-		raise MergeFailException()
+
+		return False
+	else:
+		return True
 
 def do_ftp_upload():
 	script_file = tempfile.mktemp()
@@ -255,16 +272,74 @@ def do_ftp_upload():
 
 	retcode = proc.wait();
 
+
+	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
+	_popen(cmd)
+	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
+	_popen(cmd)
+
+	print("return code: ", retcode)
+	os.unlink( script_file )
+	os.unlink( script_stdout )
+	os.unlink( script_stderr )
+	
+	return retcode
+
+def do_ftp_upload2( old_rev, new_rev ):
+	script_file = tempfile.mktemp()
+	script_stdout = script_file + ".log"
+	script_stderr = script_file + ".err"
+
+	cmd =  "git diff --name-status %s %s" % ( old_rev, new_rev )
+	cmd += "  | sed -e 's/^A\t\(.*\)/put \\1 -O \\1/g' "
+	cmd += "  | sed -e 's/^D\t\(.*\)/rm \\1/g' "
+	cmd += "  | sed -e 's/^M\t\(.*\)/put \\1 -O \\1/g' "
+	retcode, out, err = _popen(cmd)
+	
+	upload_commands_text = out
+
+	script_tmpl = """
+	debug 1
+	set ftp:list-options -a;
+	set ftp:ssl-allow no;
+	open ftp://%s:%s@%s || exit; 
+	lcd %s || exit;
+	cd %s  || exit;
+	""" 
+	script_tmpl += upload_commands_text
+	
+	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD )
+	string2file( script_txt, script_file )
+
+	cmd = "lftp -f %s" % ( script_file )
+	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )
+
+	print(cmd)
+	print(script_txt)
+
+	retcode = proc.wait();
+
+	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
+	_popen(cmd)
+	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
+	_popen(cmd)
+
 	print("return code: ", retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
 
+	return retcode
 
 if __name__ == "__main__":
-	#do_ftp_download()
-	#do_vcs_commit()
+	do_ftp_download()
+	do_vcs_commit()
 	if check_vcs_incomming():
+		old_rev = get_hash_from_branch( "master" )
 		print ( "進行 merge ..." )
-		do_vcs_merge()
-		do_ftp_upload()
+		ret = do_vcs_merge()
+		if ret:	
+			print ( "Merge 成功，進行 ftp uploading ..." )
+			#do_ftp_upload()
+			new_rev = get_hash_from_branch( "master" )
+			do_ftp_upload2( old_rev, new_rev )
