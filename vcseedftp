@@ -218,7 +218,16 @@ def get_base_hash_from_branches( br1, br2 ):
 		result = out.decode().strip()
 
 	return result
-	
+
+def get_merged_list():
+	"""return hash and log of commits from last merge line by line
+	"""
+	hash_pre_formerge	= get_hash_from_branch( "for_merge^" )
+	hash_pre_master 	= get_hash_from_branch( "master^" )
+	hash_base 			= get_base_hash_from_branches(hash_pre_formerge, hash_pre_master)
+	cmd = "git log --not --pretty='%h %s' for_merge.." + hash_base
+	_, result, _ = _popen(cmd)
+	return result.decode()
 
 def check_vcs_incomming():
 
@@ -241,21 +250,21 @@ def check_vcs_incomming():
 			print ( ">>> for_merge 的 HEAD 已在 master 的 changesets 裡，不需要再 merge " )
 		return False
 
+def do_vcs_reset():
+	# get for_merge commit hash
+	for_merge_hash = get_hash_from_branch( "for_merge" )
+	cmd =  "git reset --hard;"
+	#cmd += "git clean -df;" # 先不能執行 git clean, 不然 mirror --delete --reverse 會刪掉某些 untrack 的資料目錄
+	cmd += "echo \"%s\t%s\" >> ~/.vcseedftp-mergefail.log" % (LCD, for_merge_hash)
+	_popen(cmd)
+
 def do_vcs_merge():
 	"""merge `for_merge' branch to master branch"""
 
 	cmd = "git merge --ff-only for_merge"
-	(retcode, out, error) = _popen(cmd)
+	retcode, out, err = _popen(cmd)
 	if retcode != 0:
-		# get for_merge commit hash
-		for_merge_hash = get_hash_from_branch( "for_merge" )
-
-		print("Merge 失敗, 恢復資料中...")
-		cmd =  "git reset --hard;"
-		#cmd += "git clean -df;" # 先不能執行 git clean, 不然 mirror --delete --reverse 會刪掉某些 untrack 的資料目錄
-		cmd += "echo \"%s\t%s\" >> ~/.vcseedftp-mergefail.log" % (LCD, for_merge_hash)
-		_popen(cmd)
-
+		print("Merge 失敗, 原因: " + err.decode().strip())
 		return False
 	else:
 		return True
@@ -398,6 +407,8 @@ if __name__ == "__main__":
 		print ( "進行 merge ..." )
 		ret = do_vcs_merge()
 		if ret:	
+			msg_patch_info = get_merged_list()
+			print( "Merged patch List:\n" + msg_patch_info )
 			print ( "Merge 成功，進行 ftp uploading ..." )
 			#do_ftp_upload()
 			new_rev = get_hash_from_branch( "master" )
@@ -409,3 +420,6 @@ if __name__ == "__main__":
 				print ( ">>> ftp sync 狀態一致 <<<" )
 			else:
 				print ( "!!! local 跟 remote 檔案不一致 !!!" )
+		else:
+			print( "恢復資料中..." )
+			do_vcs_reset()
