@@ -8,6 +8,7 @@ import os
 import sys
 import subprocess
 import tempfile
+import types
 try:
 	import ConfigParser
 except ImportError:
@@ -17,64 +18,13 @@ except ImportError:
 SELF = os.path.realpath( __file__ )
 ROOT = os.path.dirname( SELF )
 
-
-if sys.argv.__len__() == 1:
-	# 預設是讀取專案目錄下的 vcseedftp.ini
-	settings_file = os.path.join( ROOT, "vcseedftp.ini")
-elif sys.argv.__len__() == 2:
-	# 若有指定 *.ini 檔，則用指定的設定檔
-	settings_file = os.path.realpath( sys.argv[1] )
-else:
-	settings_file = None
-	
-if os.access( settings_file, os.R_OK ):
-		config = ConfigParser.RawConfigParser()
-		config.optionxform = str
-		config.read(settings_file)
-else:
-	print("設定檔無法讀取: ", settings_file)
-	exit()
-
-HOST     = config.get('lftp', 'HOST')
-USER     = config.get('lftp', 'USER')
-PASS     = config.get('lftp', 'PASS')
-LCD      = config.get('lftp', 'LCD')
-RCD      = config.get('lftp', 'RCD')
+HOST     = ""
+USER     = "" 
+PASS     = "" 
+LCD      = "" 
+RCD      = "" 
 EXCL     = []
-if config.has_option( 'lftp', 'EXCL' ):
-	EXCL = config.get('lftp', 'EXCL').split('\n')
-
-EXCL += [
-	"\.hg",
-	"\.hgignore",
-	"\.git",
-	"\.gitignore",
-	"error_log",
-	"UploadFile/.*/",
-	"templates/.*/templates_c/",
-	]
-
-for i in range( 0, EXCL.__len__() ):
-	val = EXCL[i].strip()
-	if val != "":
-		EXCL[i] = "--exclude "+EXCL[i]
-
-EXCLUDES = " ".join( EXCL )
-
 FTP_PUSH = False
-if config.has_section( 'vcseedftp' ) and config.has_option( 'vcseedftp', 'FTP_PUSH' ):
-	ftp_push_str = config.get( 'vcseedftp', 'FTP_PUSH' ).strip().lower()
-	if ftp_push_str == "yes" or ftp_push_str == "true" or ftp_push_str == "enable" or ftp_push_str == "on":
-		FTP_PUSH = True
-	
-
-print("HOST: ", HOST)
-print("USER: ", USER)
-print("PASS: ", PASS)
-print("LCD : ", LCD)
-print("RCD : ", RCD)
-print("EXCL: ", EXCL)
-print("FTP_PUSH: ", FTP_PUSH)
 
 class MergeFailException(Exception): pass
 class AddChangsFailException(Exception): pass
@@ -82,8 +32,17 @@ class AddChangsFailException(Exception): pass
 def _popen(cmd):
 	"""operations from LCD"""
 	pipe = subprocess.Popen([ cmd ], shell=True, cwd=LCD, stdout = subprocess.PIPE, stderr = subprocess.PIPE )
-	(out, error) = pipe.communicate()
-	return pipe.wait(), out, error
+	(out, err) = pipe.communicate()
+
+	## for python3
+	if type( out ) == type( b"bytes" ):
+		out = str(out)
+
+	## for python3
+	if type( err ) == type( b"bytes" ):
+		err = str(err)
+
+	return pipe.wait(), out, err
 
 def file2string(path):
 	result = ""
@@ -205,7 +164,7 @@ def get_hash_from_branch( br ):
 	cmd = "git rev-list --max-count=1 '%s' | cut -c1-7 " % ( br )
 	retcode, out, err = _popen(cmd)
 	if retcode == 0:
-		result = out.decode().strip()
+		result = out.strip()
 
 	return result
 
@@ -215,7 +174,7 @@ def get_base_hash_from_branches( br1, br2 ):
 	cmd = "git merge-base %s %s | cut -c1-7" % ( br1, br2 )
 	retcode, out, err = _popen(cmd)
 	if retcode == 0:
-		result = out.decode().strip()
+		result = out.strip()
 
 	return result
 
@@ -227,7 +186,7 @@ def get_merged_list():
 	hash_base 			= get_base_hash_from_branches(hash_pre_formerge, hash_pre_master)
 	cmd = "git log --not --pretty='%h %s' for_merge.." + hash_base
 	_, result, _ = _popen(cmd)
-	return result.decode()
+	return result
 
 def check_vcs_incomming():
 
@@ -264,7 +223,7 @@ def do_vcs_merge():
 	cmd = "git merge --ff-only for_merge"
 	retcode, out, err = _popen(cmd)
 	if retcode != 0:
-		print("Merge 失敗, 原因: " + err.decode().strip())
+		print("Merge 失敗, 原因: " + err.strip())
 		return False
 	else:
 		return True
@@ -319,7 +278,7 @@ def do_ftp_upload2( old_rev, new_rev ):
 	cmd += "  | sed -e 's/^M\t\(.*\)/put \\1 -o \\1/g' "
 	retcode, out, err = _popen(cmd)
 	
-	upload_commands_text = out.decode()
+	upload_commands_text = out
 
 	script_tmpl = """
 	debug 2
@@ -398,6 +357,68 @@ def do_ftp_sync_check():
 	return result
 
 if __name__ == "__main__":
+	##
+	## 設定載入
+	##
+	if sys.argv.__len__() == 1:
+		# 預設是讀取專案目錄下的 vcseedftp.ini
+		settings_file = os.path.join( ROOT, "vcseedftp.ini")
+	elif sys.argv.__len__() == 2:
+		# 若有指定 *.ini 檔，則用指定的設定檔
+		settings_file = os.path.realpath( sys.argv[1] )
+	else:
+		settings_file = None
+		
+	if os.access( settings_file, os.R_OK ):
+			config = ConfigParser.RawConfigParser()
+			config.optionxform = str
+			config.read(settings_file)
+	else:
+		print("設定檔無法讀取: ", settings_file)
+		exit()
+
+	HOST     = config.get('lftp', 'HOST')
+	USER     = config.get('lftp', 'USER')
+	PASS     = config.get('lftp', 'PASS')
+	LCD      = config.get('lftp', 'LCD')
+	RCD      = config.get('lftp', 'RCD')
+
+	if config.has_option( 'lftp', 'EXCL' ):
+		EXCL = config.get('lftp', 'EXCL').split('\n')
+
+	EXCL += [
+		"\.hg",
+		"\.hgignore",
+		"\.git",
+		"\.gitignore",
+		"error_log",
+		"UploadFile/.*/",
+		"templates/.*/templates_c/",
+		]
+
+	for i in range( 0, EXCL.__len__() ):
+		val = EXCL[i].strip()
+		if val != "":
+			EXCL[i] = "--exclude "+EXCL[i]
+
+	EXCLUDES = " ".join( EXCL )
+
+	if config.has_section( 'vcseedftp' ) and config.has_option( 'vcseedftp', 'FTP_PUSH' ):
+		ftp_push_str = config.get( 'vcseedftp', 'FTP_PUSH' ).strip().lower()
+		if ftp_push_str == "yes" or ftp_push_str == "true" or ftp_push_str == "enable" or ftp_push_str == "on":
+			FTP_PUSH = True
+
+	print("FTP_PUSH : ", FTP_PUSH)
+	print("HOST     : ", HOST)
+	print("USER     : ", USER)
+	print("PASS     : ", PASS)
+	print("LCD      : ", LCD)
+	print("RCD      : ", RCD)
+	print("EXCL     : ", EXCL)
+
+	##
+	## 主程式
+	##
 	do_vcs_goto_branch( "master" )
 	do_ftp_download()
 	do_vcs_commit()
