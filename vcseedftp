@@ -29,6 +29,17 @@ FTP_PUSH = False
 class MergeFailException(Exception): pass
 class AddChangsFailException(Exception): pass
 
+## 檢查是否是 python3
+#
+# 檢查是否是 python3
+#
+def isPython3():
+	major_version = sys.version_info[0]
+	if major_version == 3:
+		return True
+	else:
+		return False
+
 ## 執行系統指令，並取得 stdout 跟 stderr 的結果
 #
 # @param cmd	指令的內容
@@ -272,18 +283,46 @@ def do_ftp_upload():
 	
 	return retcode
 
+## 將 git 的版本差異轉換成 lftp 的指令
+#
+# 將 git 在兩個 commit 之間的差異清單，轉換成 lftp 的指令
+#
+# @param diff_output	差異檔案清單的輸出內容 ( ex: git diff --name-status
+#
+def convert_diff_to_ftp_commands( diff_output ):
+	result = []
+
+	for line in diff_output.strip().split('\n'):
+		tag      = line.split("\t")[0]
+		filename = line.split("\t")[1]
+
+		if filename[0] == "\"" and filename[-1:] == "\"":
+			if isPython3():
+				## @todo python3 的輸出結果跟 python2 不一樣，待解的懸案
+				filename = bytes( filename[1:-1], 'utf-8').decode('unicode_escape') 
+			else:
+				filename = filename[1:-1].decode('string_escape')
+
+		if tag == "A" or tag == "M":
+			result.append( "put '%s' -o '%s' " % ( filename, filename ) )
+		elif tag == "D" :
+			result.append( "rm '%s' " % ( filename ) )
+		else:
+			result.append( "# unknow tag '%s' " % ( tag ) )
+
+	output = "\n".join( result )
+	
+	return output
+
 def do_ftp_upload2( old_rev, new_rev ):
 	script_file = tempfile.mktemp()
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
 	cmd =  "git diff --name-status %s %s" % ( old_rev, new_rev )
-	cmd += "  | sed -e 's/^A\t\(.*\)/put \\1 -o \\1/g' "
-	cmd += "  | sed -e 's/^D\t\(.*\)/rm \\1/g' "
-	cmd += "  | sed -e 's/^M\t\(.*\)/put \\1 -o \\1/g' "
 	retcode, out, err = _popen(cmd)
 	
-	upload_commands_text = out
+	upload_commands_text = convert_diff_to_ftp_commands( out )
 
 	script_tmpl = """
 	debug 2
