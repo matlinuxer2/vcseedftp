@@ -33,6 +33,7 @@ LCD      = ""
 RCD      = "" 
 EXCL     = []
 FTP_PUSH = False
+EXCLUDES = ""
 
 class MergeFailException(Exception): pass
 
@@ -415,23 +416,45 @@ def do_ftp_sync_check():
 
 	return result
 
-if __name__ == "__main__":
-	##
-	## 設定載入
-	##
+## 設定載入
+#
+# 設定檔載入功能會依照順序檢查：
+#
+#   1. 執行目錄下的 `vcseedftp.ini`
+#   2. stdin 的第一個參數
+#   3. 函式引數 path
+#
+# 作為設定檔載入，沒有則結束程式
+#
+# @param path 指定使用的設定檔路徑
+#
+def do_load_settings(path=None):
+
+	global HOST
+	global USER
+	global PASS
+	global LCD
+	global RCD
+	global EXCL
+	global FTP_PUSH
+	global EXCLUDES
+	config = None
+
 	if sys.argv.__len__() == 1:
 		# 預設是讀取專案目錄下的 vcseedftp.ini
 		settings_file = os.path.join( ROOT, "vcseedftp.ini")
 	elif sys.argv.__len__() == 2:
 		# 若有指定 *.ini 檔，則用指定的設定檔
 		settings_file = os.path.realpath( sys.argv[1] )
+	elif path is not None:
+		settings_file = os.path.readpath( path )
 	else:
 		settings_file = None
 		
 	if os.access( settings_file, os.R_OK ):
-			config = ConfigParser.RawConfigParser()
-			config.optionxform = str
-			config.read(settings_file)
+		config = ConfigParser.RawConfigParser()
+		config.optionxform = str
+		config.read(settings_file)
 	else:
 		print("設定檔無法讀取: ", settings_file)
 		exit()
@@ -475,9 +498,13 @@ if __name__ == "__main__":
 	print("RCD      : ", RCD)
 	print("EXCL     : ", EXCL)
 
-	##
-	## 主程式
-	##
+## 主程式
+#
+# 作為執行檔時會執行的主程式
+#
+def main():
+	do_load_settings()
+
 	ret = do_vcs_check()
 	if ret == 1:
 		print("本地端目錄存取有誤: ", LCD)
@@ -510,3 +537,6 @@ if __name__ == "__main__":
 		else:
 			print( "恢復資料中..." )
 			do_vcs_reset()
+
+if __name__ == "__main__":
+	main()
