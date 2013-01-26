@@ -16,7 +16,7 @@ import os
 import sys
 import subprocess
 import tempfile
-import types
+
 try:
 	import ConfigParser
 except ImportError:
@@ -35,7 +35,6 @@ EXCL     = []
 FTP_PUSH = False
 EXCLUDES = ""
 
-class MergeFailException(Exception): pass
 
 ## 檢查是否是 python3
 #
@@ -71,21 +70,12 @@ def popen(cmd):
 	return pipe.wait(), out, err
 
 def file2string(path):
-	result = ""
-	f = open(path)
-	for line in f:
-		result += line
-
-	f.close()
-
-	return result
-
+	with open(path) as f:
+		return f.read()
 
 def string2file(string, path):
-	f = open(path, 'w')
-	f.write(string)
-	f.close()
-
+	with open(path, 'w') as f:
+		f.write(string)
 
 def do_ftp_download():
 	script_file = tempfile.mktemp()
@@ -112,7 +102,7 @@ def do_ftp_download():
 	print(cmd)
 	print(script_txt)
 
-	retcode = proc.wait();
+	retcode = proc.wait()
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
 	_, result, _ = popen(cmd)
@@ -155,16 +145,11 @@ def do_vcs_check():
 		return 3
 
 def do_vcs_init():
-	path_orig = os.getcwd()
-	os.chdir( LCD )
-
-	cmd = "git init;"
-	cmd += "touch .gitignore; git add .; git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m init;"
+	cmd = "git init; touch .gitignore; "
+	cmd += "git add --all; "
+	cmd += "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m init; "
 	cmd += "git branch for_merge master"
-	proc = subprocess.Popen([ cmd ], shell=True )
-	proc.wait()
-
-	os.chdir( path_orig )
+	popen(cmd)
 
 def do_vcs_commit():
 	cmd = "git add --all; "
@@ -207,7 +192,7 @@ def get_merged_list():
 	hash_pre_formerge	= get_hash_from_branch( "for_merge^" )
 	hash_pre_master 	= get_hash_from_branch( "master^" )
 	hash_base 			= get_base_hash_from_branches(hash_pre_formerge, hash_pre_master)
-	cmd = "git log --not --pretty='%h %s' for_merge.." + hash_base
+	cmd = "git log --not --pretty='%h %s' for_merge..{0}".format(hash_base)
 	_, result, _ = popen(cmd)
 	return result
 
@@ -246,7 +231,7 @@ def do_vcs_merge():
 	cmd = "git merge --ff-only for_merge"
 	retcode, out, err = popen(cmd)
 	if retcode != 0:
-		print("Merge 失敗, 原因: " + err.strip())
+		print("Merge 失敗, 原因: %s" % err.strip())
 		return False
 	else:
 		cmd = "git merge --abort"
@@ -278,8 +263,7 @@ def do_ftp_upload():
 	print(cmd)
 	print(script_txt)
 
-	retcode = proc.wait();
-
+	retcode = proc.wait()
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
 	_, result, _ = popen(cmd)
@@ -358,7 +342,7 @@ def do_ftp_upload2( old_rev, new_rev ):
 	print(cmd)
 	print(script_txt)
 
-	retcode = proc.wait();
+	retcode = proc.wait()
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
 	popen(cmd)
@@ -400,7 +384,7 @@ def do_ftp_sync_check():
 	print(cmd)
 	print(script_txt)
 
-	retcode = proc.wait();
+	retcode = proc.wait()
 
 	print("return code: ", retcode)
 
@@ -447,10 +431,10 @@ def do_load_settings(path=None):
 		# 若有指定 *.ini 檔，則用指定的設定檔
 		settings_file = os.path.realpath( sys.argv[1] )
 	elif path is not None:
-		settings_file = os.path.readpath( path )
+		settings_file = os.path.realpath( path )
 	else:
 		settings_file = None
-		
+
 	if os.access( settings_file, os.R_OK ):
 		config = ConfigParser.RawConfigParser()
 		config.optionxform = str
@@ -522,7 +506,7 @@ def main():
 		ret = do_vcs_merge()
 		if ret:	
 			msg_patch_info = get_merged_list()
-			print( "Merged patch List:\n" + msg_patch_info )
+			print( "Merged patch List:\n%s" % msg_patch_info )
 			print ( "Merge 成功，進行 ftp uploading ..." )
 			#do_ftp_upload()
 			new_rev = get_hash_from_branch( "master" )
