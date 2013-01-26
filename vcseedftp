@@ -29,6 +29,11 @@ FTP_PUSH = False
 class MergeFailException(Exception): pass
 class AddChangsFailException(Exception): pass
 
+## 執行系統指令，並取得 stdout 跟 stderr 的結果
+#
+# @param cmd	指令的內容
+# @retval tuple	回傳值為 ( retcode, out, err )
+#
 def _popen(cmd):
 	"""operations from LCD"""
 	pipe = subprocess.Popen([ cmd ], shell=True, cwd=LCD, stdout = subprocess.PIPE, stderr = subprocess.PIPE )

@@ -19,3 +19,38 @@ mkdir:
 kill:
 	ps aux | grep 'make run'           | grep -v 'grep' | awk '{print $$2}' | xargs kill
 	ps aux | grep 'lftp -f /tmp/tmp'   | grep -v 'grep' | awk '{print $$2}' | xargs kill
+
+docs/Doxyfile:
+	( test -d docs && rm -rvf docs ) || true
+	install -d docs
+	cd docs; rm Doxyfile; doxygen -g
+	cd docs; sed -i Doxyfile -e "s/^OUTPUT_DIRECTORY .*=.*/OUTPUT_DIRECTORY = ..\/docs /g"
+	cd docs; sed -i Doxyfile -e "s/^OPTIMIZE_OUTPUT_FOR_JAVA .*=.*/OPTIMIZE_OUTPUT_FOR_JAVA = YES/g"
+	cd docs; sed -i Doxyfile -e "s/^HIDE_SCOPE_NAMES .*=.*/HIDE_SCOPE_NAMES = YES/g"
+	cd docs; sed -i Doxyfile -e "s/^INPUT .*=.*/INPUT = .. ..\/vcseedftp /g"
+	cd docs; sed -i Doxyfile -e "s/^EXCLUDE .*=.*/EXCLUDE = ..\/reference ..\/.git /g"
+	cd docs; sed -i Doxyfile -e "s/^RECURSIVE .*=.*/RECURSIVE = YES/g"
+	cd docs; sed -i Doxyfile -e "s/^GENERATE_TREEVIEW .*=.*/GENERATE_TREEVIEW = YES/g"
+	cd docs; sed -i Doxyfile -e "s/^GENERATE_LATEX .*=.*/GENERATE_LATEX = NO/g"
+	cd docs; sed -i Doxyfile -e "s/^OUTPUT_LANGUAGE .*=.*/OUTPUT_LANGUAGE = Chinese-Traditional/g"
+	cd docs; sed -i Doxyfile -e "s/^SHOW_DIRECTORIES .*=.*/SHOW_DIRECTORIES = YES/g"
+	cd docs; sed -i Doxyfile -e "s/^SOURCE_BROWSER .*=.*/SOURCE_BROWSER = YES/g"
+	cd docs; sed -i Doxyfile -e "s/^JAVADOC_AUTOBRIEF .*=.*/JAVADOC_AUTOBRIEF = YES/g"
+	cd docs; sed -i Doxyfile -e "s/^FULL_PATH_NAMES .*=.*/FULL_PATH_NAMES = YES/g"
+	cd docs; sed -i Doxyfile -e "s/^STRIP_FROM_PATH .*=.*/STRIP_FROM_PATH = .. /g"
+	cd docs; sed -i Doxyfile -e "s/^EXTENSION_MAPPING .*=.*/EXTENSION_MAPPING = no_extension=Python /g" # no_extension 的功能是 2013-01-20 的 1.8.3.1 版之後才有。
+	cd docs; sed -i Doxyfile -e "s/^FILE_PATTERNS .*=.*/FILE_PATTERNS = vcseedftp *.py /g"
+	#cd docs; sed -i Doxyfile -e "s/^INPUT_FILTER .*=.*/INPUT_FILTER = .\/input_filter.php /g"
+	#cd docs; sed -i Doxyfile -e "s/^HAVE_DOT .*=.*/HAVE_DOT = YES/g"
+	#cd docs; sed -i Doxyfile -e "s/^ALWAYS_DETAILED_SEC .*=.*/ALWAYS_DETAILED_SEC = YES/g"
+	#cd docs; sed -i Doxyfile -e "s/^ALLEXTERNALS .*=.*/ALLEXTERNALS = YES/g"
+	#cd docs; sed -i Doxyfile -e "s/^CREATE_SUBDIRS .*=.*/CREATE_SUBDIRS = YES/g"
+	#cd docs; sed -i Doxyfile -e "s/^EXTRACT_STATIC .*=.*/EXTRACT_STATIC = YES/g"
+	#cd docs; sed -i Doxyfile -e "s/^XXX .*=.*/XXX = YES/g"
+
+doc:  docs/Doxyfile
+	cd docs; doxygen
+
+view:
+	xdg-open ./docs/html/index.html
+
