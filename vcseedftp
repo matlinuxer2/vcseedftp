@@ -95,6 +95,7 @@ def do_ftp_download():
 	debug 2
 	set ftp:list-options -a;
 	set ftp:ssl-allow no;
+	set ftp:use-mdtm no
 	open ftp://%s:%s@%s || exit; 
 	lcd %s || exit;
 	cd %s  || exit;
@@ -260,6 +261,7 @@ def do_ftp_upload():
 	debug 2
 	set ftp:list-options -a;
 	set ftp:ssl-allow no;
+	set ftp:use-mdtm no
 	open ftp://%s:%s@%s || exit; 
 	lcd %s || exit;
 	cd %s  || exit;
@@ -339,6 +341,7 @@ def do_ftp_upload2( old_rev, new_rev ):
 	debug 2
 	set ftp:list-options -a;
 	set ftp:ssl-allow no;
+	set ftp:use-mdtm no
 	open ftp://%s:%s@%s || exit; 
 	lcd %s || exit;
 	cd %s  || exit;
@@ -379,6 +382,7 @@ def do_ftp_sync_check():
 	debug 2
 	set ftp:list-options -a;
 	set ftp:ssl-allow no;
+	set ftp:use-mdtm no
 	open ftp://%s:%s@%s || exit; 
 	lcd %s || exit;
 	cd %s  || exit;
