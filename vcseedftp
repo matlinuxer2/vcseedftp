@@ -298,6 +298,8 @@ def do_ftp_upload():
 # 將 git 在兩個 commit 之間的差異清單，轉換成 lftp 的指令
 #
 # @param diff_output	差異檔案清單的輸出內容 ( ex: git diff --name-status
+# 
+# @todo python3 的 Big5 中文檔名輸出結果跟 python2 不一致
 #
 def convert_diff_to_ftp_commands( diff_output ):
 	result = []

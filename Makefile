@@ -25,7 +25,7 @@ docs/Doxyfile:
 	install -d docs
 	cd docs; rm Doxyfile; doxygen -g
 	cd docs; sed -i Doxyfile -e "s/^OUTPUT_DIRECTORY .*=.*/OUTPUT_DIRECTORY = ..\/docs /g"
-	cd docs; sed -i Doxyfile -e "s/^OPTIMIZE_OUTPUT_FOR_JAVA .*=.*/OPTIMIZE_OUTPUT_FOR_JAVA = YES/g"
+	cd docs; sed -i Doxyfile -e "s/^OPTIMIZE_OUTPUT_JAVA .*=.*/OPTIMIZE_OUTPUT_JAVA = YES/g"
 	cd docs; sed -i Doxyfile -e "s/^HIDE_SCOPE_NAMES .*=.*/HIDE_SCOPE_NAMES = YES/g"
 	cd docs; sed -i Doxyfile -e "s/^INPUT .*=.*/INPUT = .. ..\/vcseedftp /g"
 	cd docs; sed -i Doxyfile -e "s/^EXCLUDE .*=.*/EXCLUDE = ..\/reference ..\/.git /g"
@@ -40,6 +40,7 @@ docs/Doxyfile:
 	cd docs; sed -i Doxyfile -e "s/^STRIP_FROM_PATH .*=.*/STRIP_FROM_PATH = .. /g"
 	cd docs; sed -i Doxyfile -e "s/^EXTENSION_MAPPING .*=.*/EXTENSION_MAPPING = no_extension=Python /g" # no_extension 的功能是 2013-01-20 的 1.8.3.1 版之後才有。
 	cd docs; sed -i Doxyfile -e "s/^FILE_PATTERNS .*=.*/FILE_PATTERNS = vcseedftp *.py /g"
+	cd docs; sed -i Doxyfile -e "s/^GENERATE_TODOLIST .*=.*/GENERATE_TODOLIST = YES /g"
 	#cd docs; sed -i Doxyfile -e "s/^INPUT_FILTER .*=.*/INPUT_FILTER = .\/input_filter.php /g"
 	#cd docs; sed -i Doxyfile -e "s/^HAVE_DOT .*=.*/HAVE_DOT = YES/g"
 	#cd docs; sed -i Doxyfile -e "s/^ALWAYS_DETAILED_SEC .*=.*/ALWAYS_DETAILED_SEC = YES/g"
@@ -60,3 +61,5 @@ doc_old:
 view:
 	xdg-open ./docs/html/index.html
 
+clean:
+	test -d docs && rm -rf docs
