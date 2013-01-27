@@ -252,6 +252,8 @@ def do_vcs_merge():
 		print("Merge 失敗, 原因: " + err.strip())
 		return False
 	else:
+		cmd = "git merge --abort"
+		popen(cmd)
 		return True
 
 def do_ftp_upload():
