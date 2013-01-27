@@ -35,7 +35,6 @@ EXCL     = []
 FTP_PUSH = False
 
 class MergeFailException(Exception): pass
-class AddChangsFailException(Exception): pass
 
 ## 檢查是否是 python3
 #
@@ -166,19 +165,8 @@ def do_vcs_init():
 	os.chdir( path_orig )
 
 def do_vcs_commit():
-	ret = do_vcs_check()
-	if ret == 1:
-		print("本地端目錄存取有誤: ", LCD)
-		exit()
-	elif ret == 2:
-		do_vcs_init()
-
-	cmd = "git add --all"
-	(retcode, out, error) = popen(cmd)
-	if retcode == 1:
-		raise AddChangesFailException("加入更動檔案時失敗")
-
-	cmd = "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -a -m \"*\" "
+	cmd = "git add --all; "
+	cmd += "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m \"*\" "
 	popen(cmd)
 
 def check_vcs_mergefailed( lcd, hash_for_merge ):
@@ -259,6 +247,8 @@ def do_vcs_merge():
 		print("Merge 失敗, 原因: " + err.strip())
 		return False
 	else:
+		cmd = "git merge --abort"
+		popen(cmd)
 		return True
 
 def do_ftp_upload():
@@ -484,6 +474,13 @@ if __name__ == "__main__":
 	##
 	## 主程式
 	##
+	ret = do_vcs_check()
+	if ret == 1:
+		print("本地端目錄存取有誤: ", LCD)
+		exit()
+	elif ret == 2:
+		do_vcs_init()
+
 	do_vcs_goto_branch( "master" )
 	do_ftp_download()
 	do_vcs_commit()

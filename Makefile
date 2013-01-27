@@ -53,7 +53,7 @@ doc:  docs/Doxyfile
 	if [ `( doxygen --version ; echo "1.8.3.1" ) | sort -r | head -1` == `doxygen --version` ]; then make doc_new; else make doc_old ;fi
 
 doc_new:
-	cd docs;                                ; doxygen;                   
+	cd docs;                                  doxygen;
 
 doc_old:
 	cd docs; cp ../vcseedftp ../vcseedftp.py; doxygen; rm ../vcseedftp.py
