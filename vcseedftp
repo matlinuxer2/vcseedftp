@@ -113,6 +113,13 @@ def do_ftp_download():
 
 	retcode = proc.wait();
 
+	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
+	_, result, _ = popen(cmd)
+	print( result )
+	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
+	_, result, _ = popen(cmd)
+	print( result )
+
 	print("return code: ", retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
@@ -121,7 +128,7 @@ def do_ftp_download():
 	return retcode
 
 def do_vcs_goto_branch( br ):
-	cmd = "git checkout --force %s " % ( br )
+	cmd = "git checkout %s " % ( br )  ## 不要用 --force ，如此會打亂 timestamp，而造成 lftp 重複 mirror
 	retcode, out, err = popen(cmd)
 
 	return retcode
@@ -282,9 +289,11 @@ def do_ftp_upload():
 
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
-	popen(cmd)
+	_, result, _ = popen(cmd)
+	print( result )
 	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
-	popen(cmd)
+	_, result, _ = popen(cmd)
+	print( result )
 
 	print("return code: ", retcode)
 	os.unlink( script_file )
