@@ -1,7 +1,15 @@
 #!/usr/bin/env python
 #encoding: utf8
-#
-# Copyright: Chun-Yu Lee (Mat) <matlinuxer2@gmail.com> || Dieter Hsu <dieterplex@gmail.com>
+
+##@namespace vcseedftp
+# 軟體執行檔
+# 
+# 這個檔案是軟體執行檔，同時也包括主要的函式庫跟實作
+# 
+# @author	Chun-Yu Lee (Mat) <matlinuxer2@gmail.com> 
+# @author	Dieter Hsu <dieterplex@gmail.com>
+# @date		2012-2013
+# @copyright	Chun-Yu Lee || Dieter Hsu 
 #
 
 import os
@@ -40,12 +48,14 @@ def isPython3():
 	else:
 		return False
 
+## 執行系統指令
+#
 ## 執行系統指令，並取得 stdout 跟 stderr 的結果
 #
 # @param cmd	指令的內容
 # @retval tuple	回傳值為 ( retcode, out, err )
 #
-def _popen(cmd):
+def popen(cmd):
 	"""operations from LCD"""
 	pipe = subprocess.Popen([ cmd ], shell=True, cwd=LCD, stdout = subprocess.PIPE, stderr = subprocess.PIPE )
 	(out, err) = pipe.communicate()
@@ -112,7 +122,7 @@ def do_ftp_download():
 
 def do_vcs_goto_branch( br ):
 	cmd = "git checkout --force %s " % ( br )
-	retcode, out, err = _popen(cmd)
+	retcode, out, err = popen(cmd)
 
 	return retcode
 
@@ -157,17 +167,17 @@ def do_vcs_commit():
 		do_vcs_init()
 
 	cmd = "git add --all"
-	(retcode, out, error) = _popen(cmd)
+	(retcode, out, error) = popen(cmd)
 	if retcode == 1:
 		raise AddChangesFailException("加入更動檔案時失敗")
 
 	cmd = "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -a -m \"*\" "
-	_popen(cmd)
+	popen(cmd)
 
 def check_vcs_mergefailed( lcd, hash_for_merge ):
 
 	cmd = "cat ~/.vcseedftp-mergefail.log | grep \"%s\t%s\" " % ( lcd, hash_for_merge )
-	retcode, out, err = _popen(cmd)
+	retcode, out, err = popen(cmd)
 	if retcode == 0:
 		hash_intersect = out.strip()
 		return True
@@ -178,7 +188,7 @@ def get_hash_from_branch( br ):
 	result = ""
 
 	cmd = "git rev-list --max-count=1 '%s' | cut -c1-7 " % ( br )
-	retcode, out, err = _popen(cmd)
+	retcode, out, err = popen(cmd)
 	if retcode == 0:
 		result = out.strip()
 
@@ -188,7 +198,7 @@ def get_base_hash_from_branches( br1, br2 ):
 	result = ""
 
 	cmd = "git merge-base %s %s | cut -c1-7" % ( br1, br2 )
-	retcode, out, err = _popen(cmd)
+	retcode, out, err = popen(cmd)
 	if retcode == 0:
 		result = out.strip()
 
@@ -201,7 +211,7 @@ def get_merged_list():
 	hash_pre_master 	= get_hash_from_branch( "master^" )
 	hash_base 			= get_base_hash_from_branches(hash_pre_formerge, hash_pre_master)
 	cmd = "git log --not --pretty='%h %s' for_merge.." + hash_base
-	_, result, _ = _popen(cmd)
+	_, result, _ = popen(cmd)
 	return result
 
 def check_vcs_incomming():
@@ -216,7 +226,7 @@ def check_vcs_incomming():
 
 	if hash_intersect != hash_for_merge and hash_for_merge != "" and hash_intersect != "":
 		if check_vcs_mergefailed( LCD, hash_for_merge ):
-			print ( ">>> Changeset %s of for_merge 曾經 merge failed, 跳過 merge" )
+			print ( ">>> Changeset %s of for_merge 曾經 merge failed, 跳過 merge" % (hash_for_merge) )
 			return False
 		else:
 			return True
@@ -231,13 +241,13 @@ def do_vcs_reset():
 	cmd =  "git reset --hard;"
 	#cmd += "git clean -df;" # 先不能執行 git clean, 不然 mirror --delete --reverse 會刪掉某些 untrack 的資料目錄
 	cmd += "echo \"%s\t%s\" >> ~/.vcseedftp-mergefail.log" % (LCD, for_merge_hash)
-	_popen(cmd)
+	popen(cmd)
 
 def do_vcs_merge():
 	"""merge `for_merge' branch to master branch"""
 
 	cmd = "git merge --ff-only for_merge"
-	retcode, out, err = _popen(cmd)
+	retcode, out, err = popen(cmd)
 	if retcode != 0:
 		print("Merge 失敗, 原因: " + err.strip())
 		return False
@@ -272,9 +282,9 @@ def do_ftp_upload():
 
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
-	_popen(cmd)
+	popen(cmd)
 	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
-	_popen(cmd)
+	popen(cmd)
 
 	print("return code: ", retcode)
 	os.unlink( script_file )
@@ -320,7 +330,7 @@ def do_ftp_upload2( old_rev, new_rev ):
 	script_stderr = script_file + ".err"
 
 	cmd =  "git diff --name-status %s %s" % ( old_rev, new_rev )
-	retcode, out, err = _popen(cmd)
+	retcode, out, err = popen(cmd)
 	
 	upload_commands_text = convert_diff_to_ftp_commands( out )
 
@@ -346,9 +356,9 @@ def do_ftp_upload2( old_rev, new_rev ):
 	retcode = proc.wait();
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
-	_popen(cmd)
+	popen(cmd)
 	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
-	_popen(cmd)
+	popen(cmd)
 
 	print("return code: ", retcode)
 	os.unlink( script_file )

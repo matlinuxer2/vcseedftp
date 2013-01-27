@@ -8,7 +8,7 @@ import vcseedftp
 
 vcseedftp.LCD = "/tmp/"
 cmd = "ls -l /tmp2/"
-retcode, out, err = vcseedftp._popen(cmd)
+retcode, out, err = vcseedftp.popen(cmd)
 print ( type( retcode ) ) 
 print ( type( out )     )
 print ( type( err )     )
