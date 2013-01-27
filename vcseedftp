@@ -151,7 +151,7 @@ def do_vcs_init():
 	os.chdir( LCD )
 
 	cmd = "git init;"
-	cmd += "touch .gitignore; git add .; git commit -m init;"
+	cmd += "touch .gitignore; git add .; git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m init;"
 	cmd += "git branch for_merge master"
 	proc = subprocess.Popen([ cmd ], shell=True )
 	proc.wait()
