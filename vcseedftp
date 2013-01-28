@@ -386,8 +386,8 @@ def do_ftp_sync_check():
 	open ftp://%s:%s@%s || exit; 
 	lcd %s || exit;
 	cd %s  || exit;
-	mirror --dry-run    --delete --verbose --parallel=5 %s ;
-	mirror --dry-run -R --delete --verbose --parallel=5 %s ;
+	mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
+	mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
 	""" 
 	
 	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
