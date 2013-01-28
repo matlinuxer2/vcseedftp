@@ -143,13 +143,42 @@ def do_vcs_check():
 		return 2
 	else:
 		return 3
-
+## 初始化 Git repository
+# 
+# @todo guard option for hook
+#
 def do_vcs_init():
 	cmd = "git init; touch .gitignore; "
 	cmd += "git add --all; "
 	cmd += "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m init; "
 	cmd += "git branch for_merge master"
 	popen(cmd)
+	#do_enable_hook()
+
+## 建立 push2upload hook script
+def do_enable_hook():
+	hook_content = """
+#!/bin/sh
+set -e
+active_branch=$(git symbolic-ref HEAD)
+read oldrev newrev branch
+[ x"$branch" == x"refs/heads/for_merge" ] || exit 1
+[ x"$branch" != x"$active_branch" ]       || exit 1
+export GIT_DIR=$(cd ${GIT_DIR}; pwd)
+export GIT_WORK_TREE="$(cd ${GIT_DIR}/..; pwd)"
+vcseedftp_file='%s'
+python <<EOF
+import imp
+x=imp.load_source('vcseedftp','$vcseedftp_file')
+x.do_push2upload('$GIT_WORK_TREE','$oldrev','$newrev')
+EOF
+""" % SELF
+	pathname = os.path.join(LCD, '.git', 'hooks', 'post-receive')
+	string2file(hook_content, pathname)
+	# chmod u+x
+	import stat
+	st = os.stat(pathname)
+	os.chmod(pathname, st.st_mode | stat.S_IEXEC)
 
 def do_vcs_commit():
 	cmd = "git add --all; "
