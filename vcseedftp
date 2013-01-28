@@ -16,7 +16,7 @@ import os
 import sys
 import subprocess
 import tempfile
-import types
+
 try:
 	import ConfigParser
 except ImportError:
@@ -33,8 +33,8 @@ LCD      = ""
 RCD      = "" 
 EXCL     = []
 FTP_PUSH = False
+EXCLUDES = ""
 
-class MergeFailException(Exception): pass
 
 ## 檢查是否是 python3
 #
@@ -70,21 +70,12 @@ def popen(cmd):
 	return pipe.wait(), out, err
 
 def file2string(path):
-	result = ""
-	f = open(path)
-	for line in f:
-		result += line
-
-	f.close()
-
-	return result
-
+	with open(path) as f:
+		return f.read()
 
 def string2file(string, path):
-	f = open(path, 'w')
-	f.write(string)
-	f.close()
-
+	with open(path, 'w') as f:
+		f.write(string)
 
 def do_ftp_download():
 	script_file = tempfile.mktemp()
@@ -111,7 +102,7 @@ def do_ftp_download():
 	print(cmd)
 	print(script_txt)
 
-	retcode = proc.wait();
+	retcode = proc.wait()
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
 	_, result, _ = popen(cmd)
@@ -152,18 +143,46 @@ def do_vcs_check():
 		return 2
 	else:
 		return 3
-
+## 初始化 Git repository
+# 
+# @todo guard option for hook
+#
 def do_vcs_init():
-	path_orig = os.getcwd()
-	os.chdir( LCD )
-
-	cmd = "git init;"
-	cmd += "touch .gitignore; git add .; git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m init;"
+	cmd = "git init; touch .gitignore; "
+	cmd += "git add --all; "
+	cmd += "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m init; "
 	cmd += "git branch for_merge master"
-	proc = subprocess.Popen([ cmd ], shell=True )
-	proc.wait()
+	popen(cmd)
+	#do_enable_hook()
 
-	os.chdir( path_orig )
+## 建立或移除 push2upload hook script
+def do_enable_hook(enable=True):
+	pathname = os.path.join(LCD, '.git', 'hooks', 'post-receive')
+	if not enable and os.access( pathname, os.W_OK ):
+		os.remove(pathname)
+		return
+
+	hook_content = """
+#!/bin/sh
+set -e
+active_branch=$(git symbolic-ref HEAD)
+read oldrev newrev branch
+[ x"$branch" == x"refs/heads/for_merge" ] || exit 1
+[ x"$branch" != x"$active_branch" ]       || exit 1
+export GIT_DIR=$(cd ${GIT_DIR}; pwd)
+export GIT_WORK_TREE="$(cd ${GIT_DIR}/..; pwd)"
+vcseedftp_file='%s'
+python <<EOF
+import imp
+x=imp.load_source('vcseedftp','$vcseedftp_file')
+x.do_push2upload('$GIT_WORK_TREE','$oldrev','$newrev')
+EOF
+""" % SELF
+	string2file(hook_content, pathname)
+	# chmod u+x
+	import stat
+	st = os.stat(pathname)
+	os.chmod(pathname, st.st_mode | stat.S_IEXEC)
 
 def do_vcs_commit():
 	cmd = "git add --all; "
@@ -206,7 +225,7 @@ def get_merged_list():
 	hash_pre_formerge	= get_hash_from_branch( "for_merge^" )
 	hash_pre_master 	= get_hash_from_branch( "master^" )
 	hash_base 			= get_base_hash_from_branches(hash_pre_formerge, hash_pre_master)
-	cmd = "git log --not --pretty='%h %s' for_merge.." + hash_base
+	cmd = "git log --not --pretty='%h %s' for_merge..{0}".format(hash_base)
 	_, result, _ = popen(cmd)
 	return result
 
@@ -245,7 +264,7 @@ def do_vcs_merge():
 	cmd = "git merge --ff-only for_merge"
 	retcode, out, err = popen(cmd)
 	if retcode != 0:
-		print("Merge 失敗, 原因: " + err.strip())
+		print("Merge 失敗, 原因: %s" % err.strip())
 		return False
 	else:
 		cmd = "git merge --abort"
@@ -277,8 +296,7 @@ def do_ftp_upload():
 	print(cmd)
 	print(script_txt)
 
-	retcode = proc.wait();
-
+	retcode = proc.wait()
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
 	_, result, _ = popen(cmd)
@@ -357,7 +375,7 @@ def do_ftp_upload2( old_rev, new_rev ):
 	print(cmd)
 	print(script_txt)
 
-	retcode = proc.wait();
+	retcode = proc.wait()
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
 	popen(cmd)
@@ -399,7 +417,7 @@ def do_ftp_sync_check():
 	print(cmd)
 	print(script_txt)
 
-	retcode = proc.wait();
+	retcode = proc.wait()
 
 	print("return code: ", retcode)
 
@@ -415,23 +433,98 @@ def do_ftp_sync_check():
 
 	return result
 
-if __name__ == "__main__":
-	##
-	## 設定載入
-	##
+## 更新即上傳
+#
+# 此功能由Server端Git repository hook呼叫時，
+# 會呼叫 do_vcs_merge() merge 到 `master` branch，
+# 並利用FTP上傳功能更新遠端檔案。
+#
+# @param work_tree Git repository 工作區路徑，尋找設定檔用
+# @param oldrev push完成前 `for_merge` branch 的 commit hash
+# @param newrev push完成後 `for_merge` branch 的 commit hash
+# @retval 回傳integer作為hook script的回傳值
+#
+# NOT TEST YET
+def do_push2upload(work_tree, oldrev, newrev):
+	def get_ini_pathname():
+		cmd = "/bin/grep -l '^LCD.*=.*%s' %s" % (work_tree, ROOT)
+		pipe = subprocess.Popen([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		out, err = pipe.communicate()
+		pipe.wait()
+		return out, err
+
+	settings_path, _ = get_ini_pathname()
+	do_load_settings( settings_path )
+
+	# check other lock
+	import time
+	repo_name = os.path.basename(work_tree)
+	lock_suffix = '.vcseedftp.lock.%s' % repo_name
+	cmd = "/bin/find /tmp -name '*%s'" % lock_suffix
+	trylimit = 3
+	while popen([cmd])[1] != "":		# found lock of this repo
+		trylimit = trylimit - 1
+		if trylimit < 1:
+			return 2					# report busy
+		time.sleep(10)
+
+	# create lock
+	lock_fd, lock = tempfile.mkstemp(suffix=lock_suffix, text=True)
+	#string2file(" ".join([work_tree, oldrev, newrev]), lock)
+
+	cmd = "test -f %s" % lock
+	retcode, _, _ = popen([cmd])
+	if retcode != 0:
+		return 1
+
+	# merge & upload
+	main()
+
+	# release lock
+	if os.access(lock, os.W_OK):
+		os.remove(lock)
+	print('>>> ok!')
+	return 0
+
+## 設定載入
+#
+# 設定檔載入功能會依照順序檢查：
+#
+#   1. 執行目錄下的 `vcseedftp.ini`
+#   2. stdin 的第一個參數
+#   3. 函式引數 path
+#
+# 作為設定檔載入，沒有則結束程式
+#
+# @param path 指定使用的設定檔路徑
+#
+def do_load_settings(path=None):
+
+	global HOST
+	global USER
+	global PASS
+	global LCD
+	global RCD
+	global EXCL
+	global FTP_PUSH
+	global EXCLUDES
+	config = None
+
 	if sys.argv.__len__() == 1:
 		# 預設是讀取專案目錄下的 vcseedftp.ini
 		settings_file = os.path.join( ROOT, "vcseedftp.ini")
 	elif sys.argv.__len__() == 2:
 		# 若有指定 *.ini 檔，則用指定的設定檔
 		settings_file = os.path.realpath( sys.argv[1] )
+	elif path is not None:
+		settings_file = os.path.realpath( path )
 	else:
 		settings_file = None
-		
+
 	if os.access( settings_file, os.R_OK ):
-			config = ConfigParser.RawConfigParser()
-			config.optionxform = str
-			config.read(settings_file)
+		config = ConfigParser.RawConfigParser()
+		config.optionxform = str
+		config.read(settings_file)
 	else:
 		print("設定檔無法讀取: ", settings_file)
 		exit()
@@ -475,9 +568,12 @@ if __name__ == "__main__":
 	print("RCD      : ", RCD)
 	print("EXCL     : ", EXCL)
 
-	##
-	## 主程式
-	##
+## 主程式
+#
+# 作為執行檔時會執行的主程式
+# 需先 do_load_settings()
+#
+def main():
 	ret = do_vcs_check()
 	if ret == 1:
 		print("本地端目錄存取有誤: ", LCD)
@@ -495,7 +591,7 @@ if __name__ == "__main__":
 		ret = do_vcs_merge()
 		if ret:	
 			msg_patch_info = get_merged_list()
-			print( "Merged patch List:\n" + msg_patch_info )
+			print( "Merged patch List:\n%s" % msg_patch_info )
 			print ( "Merge 成功，進行 ftp uploading ..." )
 			#do_ftp_upload()
 			new_rev = get_hash_from_branch( "master" )
@@ -510,3 +606,7 @@ if __name__ == "__main__":
 		else:
 			print( "恢復資料中..." )
 			do_vcs_reset()
+
+if __name__ == "__main__":
+	do_load_settings()
+	main()
