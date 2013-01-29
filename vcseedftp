@@ -335,7 +335,7 @@ def convert_diff_to_ftp_commands( diff_output ):
 				filename = filename[1:-1].decode('string_escape')
 
 		if tag == "A" or tag == "M":
-			result.append( "put '%s' -o '%s' " % ( filename, filename ) )
+			result.append( "mput -d '%s' " % ( filename ) ) # use mput to create leading directory smartly
 		elif tag == "D" :
 			result.append( "rm '%s' " % ( filename ) )
 		else:
