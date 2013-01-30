@@ -111,7 +111,7 @@ def do_ftp_download():
 	_, result, _ = popen(cmd)
 	print( result )
 
-	print("return code: ", retcode)
+	print("return code: %s" % retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
@@ -143,6 +143,7 @@ def do_vcs_check():
 		return 2
 	else:
 		return 3
+
 ## 初始化 Git repository
 # 
 # @todo guard option for hook
@@ -305,7 +306,7 @@ def do_ftp_upload():
 	_, result, _ = popen(cmd)
 	print( result )
 
-	print("return code: ", retcode)
+	print("return code: %s" % retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
@@ -384,7 +385,7 @@ def do_ftp_upload2( old_rev, new_rev ):
 	_, result, _ = popen(cmd)
 	print( result )
 
-	print("return code: ", retcode)
+	print("return code: %s" % retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
@@ -421,10 +422,10 @@ def do_ftp_sync_check():
 
 	retcode = proc.wait()
 
-	print("return code: ", retcode)
+	print("return code: %s" % retcode)
 
 	difference_complain = file2string( script_stdout )
-	print( "difference_complain: ", difference_complain )
+	print( "difference_complain: %s" % difference_complain )
 
 	if retcode == 0 and difference_complain == "":
 		result = 0
@@ -528,7 +529,7 @@ def do_load_settings(path=None):
 		config.optionxform = str
 		config.read(settings_file)
 	else:
-		print("設定檔無法讀取: ", settings_file)
+		print("設定檔無法讀取: %s" % settings_file)
 		exit()
 
 	HOST     = config.get('lftp', 'HOST')
@@ -562,13 +563,13 @@ def do_load_settings(path=None):
 		if ftp_push_str == "yes" or ftp_push_str == "true" or ftp_push_str == "enable" or ftp_push_str == "on":
 			FTP_PUSH = True
 
-	print("FTP_PUSH : ", FTP_PUSH)
-	print("HOST     : ", HOST)
-	print("USER     : ", USER)
-	print("PASS     : ", PASS)
-	print("LCD      : ", LCD)
-	print("RCD      : ", RCD)
-	print("EXCL     : ", EXCL)
+	print("FTP_PUSH : %s" % FTP_PUSH)
+	print("HOST     : %s" % HOST)
+	print("USER     : %s" % USER)
+	print("PASS     : %s" % PASS)
+	print("LCD      : %s" % LCD)
+	print("RCD      : %s" % RCD)
+	print("EXCL     : %s" % EXCL)
 
 ## 主程式
 #
@@ -578,7 +579,7 @@ def do_load_settings(path=None):
 def main():
 	ret = do_vcs_check()
 	if ret == 1:
-		print("本地端目錄存取有誤: ", LCD)
+		print("本地端目錄存取有誤: %s" % LCD)
 		exit()
 	elif ret == 2:
 		do_vcs_init()
