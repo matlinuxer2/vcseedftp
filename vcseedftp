@@ -532,6 +532,18 @@ def do_load_settings(path=None):
 		print("設定檔無法讀取: %s" % settings_file)
 		exit()
 
+	# project_name is the first output line and indicate which .ini is processing
+	project_name = None
+	settings_name = os.path.basename(settings_file)
+	if settings_name == "vcseedftp.ini":
+			project_name = 'default'
+	elif settings_name.endswith('.ini'):
+			project_name = settings_name[:-4]
+	else:
+			project_name = settings_name
+
+	print("PROJECT  : %s" %  project_name)
+
 	HOST     = config.get('lftp', 'HOST')
 	USER     = config.get('lftp', 'USER')
 	PASS     = config.get('lftp', 'PASS')
