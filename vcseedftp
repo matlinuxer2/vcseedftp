@@ -25,6 +25,7 @@ except ImportError:
 
 SELF = os.path.realpath( __file__ )
 ROOT = os.path.dirname( SELF )
+SETTINGS_FILE
 
 HOST     = ""
 USER     = "" 
@@ -33,6 +34,7 @@ LCD      = ""
 RCD      = "" 
 EXCL     = []
 FTP_PUSH = False
+USE_HOOK = False
 EXCLUDES = ""
 
 
@@ -143,9 +145,11 @@ def do_vcs_check():
 		return 2
 	else:
 		return 3
+
 ## 初始化 Git repository
-# 
-# @todo guard option for hook
+#
+#  初始化 git repository 和建立 `for_merge` branch
+#  如果使用 USE_HOOK 選項時，會啟用 push2upload hook。
 #
 def do_vcs_init():
 	cmd = "git init; touch .gitignore; "
@@ -153,36 +157,37 @@ def do_vcs_init():
 	cmd += "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m init; "
 	cmd += "git branch for_merge master"
 	popen(cmd)
-	#do_enable_hook()
+	do_enable_hook( enable=USE_HOOK )
 
 ## 建立或移除 push2upload hook script
 def do_enable_hook(enable=True):
 	pathname = os.path.join(LCD, '.git', 'hooks', 'post-receive')
 	if not enable and os.access( pathname, os.W_OK ):
 		os.remove(pathname)
-		return
+		print("Hook 已刪除")
+		return -1
 
-	hook_content = """
-#!/bin/sh
-set -e
-active_branch=$(git symbolic-ref HEAD)
-read oldrev newrev branch
-[ x"$branch" == x"refs/heads/for_merge" ] || exit 1
-[ x"$branch" != x"$active_branch" ]       || exit 1
-export GIT_DIR=$(cd ${GIT_DIR}; pwd)
-export GIT_WORK_TREE="$(cd ${GIT_DIR}/..; pwd)"
-vcseedftp_file='%s'
-python <<EOF
+	# Hook 以模組方式載入 vcseedftp 執行主程式
+	hook_content = """\
+#!/usr/bin/python
+import sys, os
+vcseedftp_file = '%s'
+vcseedftp_ini = '%s'
+if 'GIT_DIR' in os.environ.keys():
+	print( "GIT_DIR: %%s" %% os.environ['GIT_DIR'] )
+	del os.environ['GIT_DIR']
 import imp
-x=imp.load_source('vcseedftp','$vcseedftp_file')
-x.do_push2upload('$GIT_WORK_TREE','$oldrev','$newrev')
-EOF
-""" % SELF
+x = imp.load_source( 'vcseedftp', vcseedftp_file )
+x.do_load_settings( vcseedftp_ini )
+sys.exit( x.main() )""" % ( SELF, SETTINGS_FILE)
+
 	string2file(hook_content, pathname)
 	# chmod u+x
 	import stat
 	st = os.stat(pathname)
 	os.chmod(pathname, st.st_mode | stat.S_IEXEC)
+	print("Hook 已建立")
+	return 0
 
 def do_vcs_commit():
 	cmd = "git add --all; "
@@ -433,59 +438,6 @@ def do_ftp_sync_check():
 
 	return result
 
-## 更新即上傳
-#
-# 此功能由Server端Git repository hook呼叫時，
-# 會呼叫 do_vcs_merge() merge 到 `master` branch，
-# 並利用FTP上傳功能更新遠端檔案。
-#
-# @param work_tree Git repository 工作區路徑，尋找設定檔用
-# @param oldrev push完成前 `for_merge` branch 的 commit hash
-# @param newrev push完成後 `for_merge` branch 的 commit hash
-# @retval 回傳integer作為hook script的回傳值
-#
-# NOT TEST YET
-def do_push2upload(work_tree, oldrev, newrev):
-	def get_ini_pathname():
-		cmd = "/bin/grep -l '^LCD.*=.*%s' %s" % (work_tree, ROOT)
-		pipe = subprocess.Popen([cmd], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		out, err = pipe.communicate()
-		pipe.wait()
-		return out, err
-
-	settings_path, _ = get_ini_pathname()
-	do_load_settings( settings_path )
-
-	# check other lock
-	import time
-	repo_name = os.path.basename(work_tree)
-	lock_suffix = '.vcseedftp.lock.%s' % repo_name
-	cmd = "/bin/find /tmp -name '*%s'" % lock_suffix
-	trylimit = 3
-	while popen([cmd])[1] != "":		# found lock of this repo
-		trylimit = trylimit - 1
-		if trylimit < 1:
-			return 2					# report busy
-		time.sleep(10)
-
-	# create lock
-	lock_fd, lock = tempfile.mkstemp(suffix=lock_suffix, text=True)
-	#string2file(" ".join([work_tree, oldrev, newrev]), lock)
-
-	cmd = "test -f %s" % lock
-	retcode, _, _ = popen([cmd])
-	if retcode != 0:
-		return 1
-
-	# merge & upload
-	main()
-
-	# release lock
-	if os.access(lock, os.W_OK):
-		os.remove(lock)
-	print('>>> ok!')
-	return 0
-
 ## 設定載入
 #
 # 設定檔載入功能會依照順序檢查：
@@ -507,26 +459,28 @@ def do_load_settings(path=None):
 	global RCD
 	global EXCL
 	global FTP_PUSH
+	global USE_HOOK
 	global EXCLUDES
+	global SETTINGS_FILE
 	config = None
 
 	if sys.argv.__len__() == 1:
 		# 預設是讀取專案目錄下的 vcseedftp.ini
-		settings_file = os.path.join( ROOT, "vcseedftp.ini")
+		SETTINGS_FILE = os.path.join( ROOT, "vcseedftp.ini")
 	elif sys.argv.__len__() == 2:
 		# 若有指定 *.ini 檔，則用指定的設定檔
-		settings_file = os.path.realpath( sys.argv[1] )
+		SETTINGS_FILE = os.path.realpath( sys.argv[1] )
 	elif path is not None:
-		settings_file = os.path.realpath( path )
+		SETTINGS_FILE = os.path.realpath( path )
 	else:
-		settings_file = None
+		SETTINGS_FILE = None
 
-	if os.access( settings_file, os.R_OK ):
+	if os.access( SETTINGS_FILE, os.R_OK ):
 		config = ConfigParser.RawConfigParser()
 		config.optionxform = str
-		config.read(settings_file)
+		config.read(SETTINGS_FILE)
 	else:
-		print("設定檔無法讀取: ", settings_file)
+		print("設定檔無法讀取: ", SETTINGS_FILE)
 		exit()
 
 	HOST     = config.get('lftp', 'HOST')
@@ -555,12 +509,18 @@ def do_load_settings(path=None):
 
 	EXCLUDES = " ".join( EXCL )
 
-	if config.has_section( 'vcseedftp' ) and config.has_option( 'vcseedftp', 'FTP_PUSH' ):
-		ftp_push_str = config.get( 'vcseedftp', 'FTP_PUSH' ).strip().lower()
-		if ftp_push_str == "yes" or ftp_push_str == "true" or ftp_push_str == "enable" or ftp_push_str == "on":
-			FTP_PUSH = True
+	def _get_bool_value(section, option):
+		if config.has_section( section ) and config.has_option( section , option ):
+			ftp_push_str = config.get( section , option ).strip().lower()
+			if ftp_push_str in ['yes', 'true', 'enable', 'on']:
+				return True
+			else:
+				return False
+	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
+	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
 
 	print("FTP_PUSH : ", FTP_PUSH)
+	print("USE_HOOK : ", USE_HOOK)
 	print("HOST     : ", HOST)
 	print("USER     : ", USER)
 	print("PASS     : ", PASS)
