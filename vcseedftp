@@ -167,19 +167,12 @@ def do_enable_hook(enable=True):
 		print("Hook 已刪除")
 		return -1
 
-	# Hook 以模組方式載入 vcseedftp 執行主程式
-	hook_content = """\
-#!/usr/bin/python
-import sys, os
-vcseedftp_file = '%s'
-vcseedftp_ini = '%s'
-if 'GIT_DIR' in os.environ.keys():
-	print( "GIT_DIR: %%s" %% os.environ['GIT_DIR'] )
-	del os.environ['GIT_DIR']
-import imp
-x = imp.load_source( 'vcseedftp', vcseedftp_file )
-x.do_load_settings( vcseedftp_ini )
-sys.exit( x.main() )""" % ( SELF, SETTINGS_FILE)
+	# Hook 直接執行 vcseedftp
+	# @todo async hook
+	hook_content = """#!/bin/sh
+unset $GIT_DIR
+python $%s $%s
+""" % ( SELF, SETTINGS_FILE)
 
 	string2file(hook_content, pathname)
 	# chmod u+x
