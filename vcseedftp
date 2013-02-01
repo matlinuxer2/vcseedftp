@@ -113,7 +113,7 @@ def do_ftp_download():
 	_, result, _ = popen(cmd)
 	print( result )
 
-	print("return code: ", retcode)
+	print("return code: %s" % retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
@@ -303,7 +303,7 @@ def do_ftp_upload():
 	_, result, _ = popen(cmd)
 	print( result )
 
-	print("return code: ", retcode)
+	print("return code: %s" % retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
@@ -333,7 +333,7 @@ def convert_diff_to_ftp_commands( diff_output ):
 				filename = filename[1:-1].decode('string_escape')
 
 		if tag == "A" or tag == "M":
-			result.append( "put '%s' -o '%s' " % ( filename, filename ) )
+			result.append( "mput -d '%s' " % ( filename ) ) # use mput to create leading directory smartly
 		elif tag == "D" :
 			result.append( "rm '%s' " % ( filename ) )
 		else:
@@ -376,11 +376,13 @@ def do_ftp_upload2( old_rev, new_rev ):
 	retcode = proc.wait()
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
-	popen(cmd)
+	_, result, _ = popen(cmd)
+	print( result )
 	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
-	popen(cmd)
+	_, result, _ = popen(cmd)
+	print( result )
 
-	print("return code: ", retcode)
+	print("return code: %s" % retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
@@ -402,8 +404,8 @@ def do_ftp_sync_check():
 	open ftp://%s:%s@%s || exit; 
 	lcd %s || exit;
 	cd %s  || exit;
-	mirror --dry-run    --delete --verbose --parallel=5 %s ;
-	mirror --dry-run -R --delete --verbose --parallel=5 %s ;
+	mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
+	mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
 	""" 
 	
 	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
@@ -417,10 +419,10 @@ def do_ftp_sync_check():
 
 	retcode = proc.wait()
 
-	print("return code: ", retcode)
+	print("return code: %s" % retcode)
 
 	difference_complain = file2string( script_stdout )
-	print( "difference_complain: ", difference_complain )
+	print( "difference_complain: %s" % difference_complain )
 
 	if retcode == 0 and difference_complain == "":
 		result = 0
@@ -473,8 +475,20 @@ def do_load_settings(path=None):
 		config.optionxform = str
 		config.read(SETTINGS_FILE)
 	else:
-		print("設定檔無法讀取: ", SETTINGS_FILE)
+		print("設定檔無法讀取: %s" % SETTINGS_FILE)
 		exit()
+
+	# project_name is the first output line and indicate which .ini is processing
+	project_name = None
+	settings_name = os.path.basename(SETTINGS_FILE)
+	if settings_name == "vcseedftp.ini":
+			project_name = 'default'
+	elif settings_name.endswith('.ini'):
+			project_name = settings_name[:-4]
+	else:
+			project_name = settings_name
+
+	print("PROJECT  : %s" %  project_name)
 
 	HOST     = config.get('lftp', 'HOST')
 	USER     = config.get('lftp', 'USER')
@@ -512,14 +526,14 @@ def do_load_settings(path=None):
 	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
 	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
 
-	print("FTP_PUSH : ", FTP_PUSH)
-	print("USE_HOOK : ", USE_HOOK)
-	print("HOST     : ", HOST)
-	print("USER     : ", USER)
-	print("PASS     : ", PASS)
-	print("LCD      : ", LCD)
-	print("RCD      : ", RCD)
-	print("EXCL     : ", EXCL)
+	print("FTP_PUSH : %s" % FTP_PUSH)
+	print("USE_HOOK : %s" % USE_HOOK)
+	print("HOST     : %s" % HOST)
+	print("USER     : %s" % USER)
+	print("PASS     : %s" % PASS)
+	print("LCD      : %s" % LCD)
+	print("RCD      : %s" % RCD)
+	print("EXCL     : %s" % EXCL)
 
 ## 主程式
 #
@@ -529,7 +543,7 @@ def do_load_settings(path=None):
 def main():
 	ret = do_vcs_check()
 	if ret == 1:
-		print("本地端目錄存取有誤: ", LCD)
+		print("本地端目錄存取有誤: %s" % LCD)
 		exit()
 	elif ret == 2:
 		do_vcs_init()
