@@ -25,7 +25,7 @@ except ImportError:
 
 SELF = os.path.realpath( __file__ )
 ROOT = os.path.dirname( SELF )
-SETTINGS_FILE
+SETTINGS_FILE = None
 
 HOST     = ""
 USER     = "" 
@@ -170,8 +170,8 @@ def do_enable_hook(enable=True):
 	# Hook 直接執行 vcseedftp
 	# @todo async hook
 	hook_content = """#!/bin/sh
-unset $GIT_DIR
-python $%s $%s
+unset GIT_DIR
+python %s %s
 """ % ( SELF, SETTINGS_FILE)
 
 	string2file(hook_content, pathname)
