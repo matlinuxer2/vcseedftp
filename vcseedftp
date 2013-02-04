@@ -16,6 +16,7 @@ import os
 import sys
 import subprocess
 import tempfile
+import psutil
 
 try:
 	import ConfigParser
@@ -79,6 +80,37 @@ def file2string(path):
 def string2file(string, path):
 	with open(path, 'w') as f:
 		f.write(string)
+
+## 檢查是否已有相同的程式在執行
+#
+# 檢查是否已有相同的程式在執行
+#
+# @param conf_name	設定檔的名稱
+# @retval bool True, 表示已有相同程式在執行; False, 表示沒有相同的程式在執行
+#
+def check_process_running( conf_name ):
+	result = False
+
+	cur_pid = os.getpid() # 自己的 pid
+
+	for pid in psutil.get_pid_list():
+		try:   
+			proc = psutil.Process(pid)
+			cmdline  = proc.cmdline
+		except:
+			continue
+
+		prog_name = os.path.basename( __file__ )
+		if pid != cur_pid and cmdline.__len__() >= 3:
+			check0 = ( cmdline[0].find( "python"  ) >=0 )
+			check1 = ( cmdline[1].find( prog_name ) >=0 )
+			check2 = ( cmdline[2].find( conf_name ) >=0 )
+
+			if check0 and check1 and check2:
+				print( "找到相同的程式已經在執行中 pid=%s ,\"%s\"" % ( pid, "".join( cmdline )  ) )
+				result = True
+
+	return result
 
 def do_ftp_download():
 	script_file = tempfile.mktemp()
@@ -151,7 +183,6 @@ def do_vcs_check():
 ## 初始化 Git repository
 #
 #  初始化 git repository 和建立 `for_merge` branch
-#  如果使用 USE_HOOK 選項時，會啟用 push2upload hook。
 #
 def do_vcs_init():
 	cmd = "git init; touch .gitignore; "
@@ -159,10 +190,14 @@ def do_vcs_init():
 	cmd += "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m init; "
 	cmd += "git branch for_merge master"
 	popen(cmd)
-	do_enable_hook( enable=USE_HOOK )
 
 ## 建立或移除 push2upload hook script
-def do_enable_hook(enable=True):
+# 
+# 如果使用 USE_HOOK 選項時，會啟用 push2upload hook。
+#
+# @param enable	若是 True, 則開啟 git 的 hook 設定; 若False, 則移除 git 的 hook 設定
+#
+def do_vcs_setup_hook(enable=True):
 	pathname = os.path.join(LCD, '.git', 'hooks', 'post-receive')
 	if not enable and os.access( pathname, os.W_OK ):
 		os.remove(pathname)
@@ -450,6 +485,7 @@ mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
 # 作為設定檔載入，沒有則結束程式
 #
 # @param path 指定使用的設定檔路徑
+# @retval string 設定檔的路徑
 #
 def do_load_settings(path=None):
 
@@ -541,6 +577,8 @@ def do_load_settings(path=None):
 	print("RCD      : %s" % RCD)
 	print("EXCL     : %s" % EXCL)
 
+	return SETTINGS_FILE
+
 ## 主程式
 #
 # 作為執行檔時會執行的主程式
@@ -554,6 +592,7 @@ def main():
 	elif ret == 2:
 		do_vcs_init()
 
+	do_vcs_setup_hook( enable=USE_HOOK ) # 每次都執行
 	do_vcs_goto_branch( "master" )
 	do_ftp_download()
 	do_vcs_commit()
@@ -581,5 +620,10 @@ def main():
 			do_vcs_reset()
 
 if __name__ == "__main__":
-	do_load_settings()
-	main()
+	conf_path = do_load_settings()
+	conf_name = os.path.basename( conf_path )
+	isRun = check_process_running( conf_name )
+	if isRun:
+		print( "已經有相同的程式在執行了..." )
+	else:
+		main()
