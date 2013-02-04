@@ -27,6 +27,7 @@ SELF = os.path.realpath( __file__ )
 ROOT = os.path.dirname( SELF )
 SETTINGS_FILE = None
 
+TIMEZONE = os.getenv('TZ')
 HOST     = ""
 USER     = "" 
 PASS     = "" 
@@ -89,13 +90,14 @@ debug 2
 set ftp:list-options -a;
 set ftp:ssl-allow no;
 set ftp:use-mdtm no
+set ftp:timezone %s
 open ftp://%s:%s@%s || exit; 
 lcd %s || exit;
 cd %s  || exit;
 mirror --delete --verbose --parallel=3 %s ;
 """ 
 	
-	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES )
+	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -280,13 +282,14 @@ debug 2
 set ftp:list-options -a;
 set ftp:ssl-allow no;
 set ftp:use-mdtm no
+set ftp:timezone %s
 open ftp://%s:%s@%s || exit; 
 lcd %s || exit;
 cd %s  || exit;
 mirror --reverse --dry-run --delete --verbose=3 --parallel=3 %s ;
 """ 
 	
-	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES )
+	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -359,13 +362,14 @@ debug 2
 set ftp:list-options -a;
 set ftp:ssl-allow no;
 set ftp:use-mdtm no
+set ftp:timezone %s
 open ftp://%s:%s@%s || exit; 
 lcd %s || exit;
 cd %s  || exit;
 """ 
 	script_tmpl += upload_commands_text
 	
-	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD )
+	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -402,6 +406,7 @@ debug 2
 set ftp:list-options -a;
 set ftp:ssl-allow no;
 set ftp:use-mdtm no
+set ftp:timezone %s
 open ftp://%s:%s@%s || exit; 
 lcd %s || exit;
 cd %s  || exit;
@@ -409,7 +414,7 @@ mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
 mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
 """ 
 	
-	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
+	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
