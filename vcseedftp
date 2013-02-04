@@ -84,16 +84,16 @@ def do_ftp_download():
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
-	script_tmpl = """
-	debug 2
-	set ftp:list-options -a;
-	set ftp:ssl-allow no;
-	set ftp:use-mdtm no
-	open ftp://%s:%s@%s || exit; 
-	lcd %s || exit;
-	cd %s  || exit;
-	mirror --delete --verbose --parallel=3 %s ;
-	""" 
+	script_tmpl = """\
+debug 2
+set ftp:list-options -a;
+set ftp:ssl-allow no;
+set ftp:use-mdtm no
+open ftp://%s:%s@%s || exit; 
+lcd %s || exit;
+cd %s  || exit;
+mirror --delete --verbose --parallel=3 %s ;
+""" 
 	
 	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
@@ -169,7 +169,8 @@ def do_enable_hook(enable=True):
 
 	# Hook 直接執行 vcseedftp
 	# @todo async hook
-	hook_content = """#!/bin/sh
+	hook_content = """\
+#!/bin/sh
 unset GIT_DIR
 python %s %s
 """ % ( SELF, SETTINGS_FILE)
@@ -274,16 +275,16 @@ def do_ftp_upload():
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
-	script_tmpl = """
-	debug 2
-	set ftp:list-options -a;
-	set ftp:ssl-allow no;
-	set ftp:use-mdtm no
-	open ftp://%s:%s@%s || exit; 
-	lcd %s || exit;
-	cd %s  || exit;
-	mirror --reverse --dry-run --delete --verbose=3 --parallel=3 %s ;
-	""" 
+	script_tmpl = """\
+debug 2
+set ftp:list-options -a;
+set ftp:ssl-allow no;
+set ftp:use-mdtm no
+open ftp://%s:%s@%s || exit; 
+lcd %s || exit;
+cd %s  || exit;
+mirror --reverse --dry-run --delete --verbose=3 --parallel=3 %s ;
+""" 
 	
 	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
@@ -353,15 +354,15 @@ def do_ftp_upload2( old_rev, new_rev ):
 	
 	upload_commands_text = convert_diff_to_ftp_commands( out )
 
-	script_tmpl = """
-	debug 2
-	set ftp:list-options -a;
-	set ftp:ssl-allow no;
-	set ftp:use-mdtm no
-	open ftp://%s:%s@%s || exit; 
-	lcd %s || exit;
-	cd %s  || exit;
-	""" 
+	script_tmpl = """\
+debug 2
+set ftp:list-options -a;
+set ftp:ssl-allow no;
+set ftp:use-mdtm no
+open ftp://%s:%s@%s || exit; 
+lcd %s || exit;
+cd %s  || exit;
+""" 
 	script_tmpl += upload_commands_text
 	
 	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD )
@@ -396,17 +397,17 @@ def do_ftp_sync_check():
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
-	script_tmpl = """
-	debug 2
-	set ftp:list-options -a;
-	set ftp:ssl-allow no;
-	set ftp:use-mdtm no
-	open ftp://%s:%s@%s || exit; 
-	lcd %s || exit;
-	cd %s  || exit;
-	mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
-	mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
-	""" 
+	script_tmpl = """\
+debug 2
+set ftp:list-options -a;
+set ftp:ssl-allow no;
+set ftp:use-mdtm no
+open ftp://%s:%s@%s || exit; 
+lcd %s || exit;
+cd %s  || exit;
+mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
+mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
+""" 
 	
 	script_txt = script_tmpl % ( USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
 	string2file( script_txt, script_file )
