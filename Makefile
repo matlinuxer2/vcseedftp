@@ -49,6 +49,14 @@ docs/Doxyfile:
 	#cd docs; sed -i Doxyfile -e "s/^EXTRACT_STATIC .*=.*/EXTRACT_STATIC = YES/g"
 	#cd docs; sed -i Doxyfile -e "s/^XXX .*=.*/XXX = YES/g"
 
+logs/mbox:
+	test -d logs || install -d logs
+	rsync -avz --rsh="ssh -p 11022" mat@219.84.143.48:mbox logs/mbox
+
+log: logs/mbox
+	test -d logs || install -d logs
+	./logview.py logs/mbox	
+
 doc:  docs/Doxyfile
 	if [ `( doxygen --version ; echo "1.8.3.1" ) | sort -r | head -1` == `doxygen --version` ]; then make doc_new; else make doc_old ;fi
 
@@ -60,6 +68,8 @@ doc_old:
 
 view:
 	xdg-open ./docs/html/index.html
+	xdg-open ./logs/index.html
 
 clean:
 	test -d docs && rm -rf docs
+	test -d logs && rm -rf logs

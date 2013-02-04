@@ -19,7 +19,7 @@ def write_all_mail_to_logs(mbox_path='mbox', output_path='logs'):
 def list_filenames_from_logs_dir(path='logs'):
 	import json, subprocess
 	#path = os.path.realpath(path) 
-	file_list = subprocess.check_output(['/bin/sh','-c', 'find %s ' % path ])
+	file_list = subprocess.check_output(['/bin/sh','-c', 'cd %s; find . ' % path ])
 	filenames = json.dumps( sorted(file_list.strip().split('\n')) )
 	index_template = """<!DOCTYPE html><html><head><title>VCSeedFTP Log View</title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
@@ -77,7 +77,7 @@ $( document ).ready( function() {
 </body></html>
 """ % (filenames, "")
 
-	with open('index.html', 'w') as f:
+	with open('logs/index.html', 'w') as f:
 		f.write(index_template )
 
 if __name__ == "__main__":
@@ -85,5 +85,5 @@ if __name__ == "__main__":
 		print(' NO mbox filename to read from')
 		print('usage: %s <exported_mbox>'%sys.argv[0])
 		sys.exit()
-#	write_all_mail_to_logs( mbox_path=sys.argv[1] )
+	write_all_mail_to_logs( mbox_path=sys.argv[1] )
 	list_filenames_from_logs_dir()
