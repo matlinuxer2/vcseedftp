@@ -564,8 +564,8 @@ def do_load_settings(path=None):
 			ftp_push_str = config.get( section , option ).strip().lower()
 			if ftp_push_str in ['yes', 'true', 'enable', 'on']:
 				return True
-			else:
-				return False
+		return False
+
 	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
 	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
 
