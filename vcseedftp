@@ -17,6 +17,7 @@ import sys
 import subprocess
 import tempfile
 import psutil
+import time
 
 try:
 	import ConfigParser
@@ -107,7 +108,7 @@ def check_process_running( conf_name ):
 			check2 = ( cmdline[2].find( conf_name ) >=0 )
 
 			if check0 and check1 and check2:
-				print( "找到相同的程式已經在執行中 pid=%s ,\"%s\"" % ( pid, "".join( cmdline )  ) )
+				print( "找到相同的程式已經在執行中 pid=%s ,\"%s\"" % ( pid, " ".join( cmdline )  ) )
 				result = True
 
 	return result
@@ -622,8 +623,16 @@ def main():
 if __name__ == "__main__":
 	conf_path = do_load_settings()
 	conf_name = os.path.basename( conf_path )
-	isRun = check_process_running( conf_name )
-	if isRun:
-		print( "已經有相同的程式在執行了..." )
-	else:
-		main()
+
+	retry, sleep_sec = 3, 30
+	while True:
+		isRun = check_process_running( conf_name )
+		if isRun:
+			retry = retry - 1
+			if not retry:
+				print( "程式忙碌中，結束重試！" )
+				sys.exit(1)
+			print( "等待%d秒重試中..." % sleep_sec )
+			time.sleep(sleep_sec)
+		else:
+			sys.exit(main())
