@@ -30,6 +30,9 @@ ROOT = os.path.dirname( SELF )
 SETTINGS_FILE = None
 
 TIMEZONE = os.getenv('TZ')
+if TIMEZONE == None :
+	TIMEZONE = ""
+
 HOST     = ""
 USER     = "" 
 PASS     = "" 
@@ -122,8 +125,8 @@ def do_ftp_download():
 debug 2
 set ftp:list-options -a;
 set ftp:ssl-allow no;
-set ftp:use-mdtm no
-set ftp:timezone %s
+#set ftp:use-mdtm no
+#set ftp:timezone %s
 open ftp://%s:%s@%s || exit; 
 lcd %s || exit;
 cd %s  || exit;
@@ -317,8 +320,8 @@ def do_ftp_upload():
 debug 2
 set ftp:list-options -a;
 set ftp:ssl-allow no;
-set ftp:use-mdtm no
-set ftp:timezone %s
+#set ftp:use-mdtm no
+#set ftp:timezone %s
 open ftp://%s:%s@%s || exit; 
 lcd %s || exit;
 cd %s  || exit;
@@ -397,8 +400,8 @@ def do_ftp_upload2( old_rev, new_rev ):
 debug 2
 set ftp:list-options -a;
 set ftp:ssl-allow no;
-set ftp:use-mdtm no
-set ftp:timezone %s
+#set ftp:use-mdtm no
+#set ftp:timezone %s
 open ftp://%s:%s@%s || exit; 
 lcd %s || exit;
 cd %s  || exit;
@@ -446,8 +449,8 @@ set ftp:timezone %s
 open ftp://%s:%s@%s || exit; 
 lcd %s || exit;
 cd %s  || exit;
-mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
-mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
+mirror --ignore-time --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
+mirror --ignore-time --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
 """ 
 	
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
