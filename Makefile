@@ -71,5 +71,5 @@ view:
 	xdg-open ./logs/index.html
 
 clean:
-	test -d docs && rm -rf docs
-	test -d logs && rm -rf logs
+	( test -d docs && rm -rf docs ) || true
+	( test -d logs && rm -rf logs ) || true
