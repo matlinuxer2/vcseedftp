@@ -212,7 +212,7 @@ def do_vcs_setup_hook(enable=True):
 	# @todo async hook
 	hook_content = """\
 #!/bin/sh
-( which at >/dev/null 2>&1 ) && ( echo "python %s %s" | at now ) && exit
+( which at >/dev/null 2>&1 ) && ( echo "python %s %s" | at now+2min ) && exit
 unset GIT_DIR
 python %s %s
 """ % ( SELF, SETTINGS_FILE, SELF, SETTINGS_FILE )
