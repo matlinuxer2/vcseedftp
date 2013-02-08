@@ -3,13 +3,13 @@
 
 ##@namespace vcseedftp
 # 軟體執行檔
-# 
+#
 # 這個檔案是軟體執行檔，同時也包括主要的函式庫跟實作
-# 
-# @author	Chun-Yu Lee (Mat) <matlinuxer2@gmail.com> 
+#
+# @author	Chun-Yu Lee (Mat) <matlinuxer2@gmail.com>
 # @author	Dieter Hsu <dieterplex@gmail.com>
 # @date		2012-2013
-# @copyright	Chun-Yu Lee || Dieter Hsu 
+# @copyright	Chun-Yu Lee || Dieter Hsu
 #
 
 import os
@@ -34,10 +34,10 @@ if TIMEZONE == None :
 	TIMEZONE = ""
 
 HOST     = ""
-USER     = "" 
-PASS     = "" 
-LCD      = "" 
-RCD      = "" 
+USER     = ""
+PASS     = ""
+LCD      = ""
+RCD      = ""
 EXCL     = []
 FTP_PUSH = False
 USE_HOOK = False
@@ -98,7 +98,7 @@ def check_process_running( conf_name ):
 	cur_pid = os.getpid() # 自己的 pid
 
 	for pid in psutil.get_pid_list():
-		try:   
+		try:
 			proc = psutil.Process(pid)
 			cmdline  = proc.cmdline
 		except:
@@ -127,12 +127,12 @@ set ftp:list-options -a;
 set ftp:ssl-allow no;
 #set ftp:use-mdtm no
 #set ftp:timezone %s
-open ftp://%s:%s@%s || exit; 
+open ftp://%s:%s@%s || exit;
 lcd %s || exit;
 cd %s  || exit;
 mirror --delete --verbose --parallel=3 %s ;
-""" 
-	
+"""
+
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
 
@@ -172,7 +172,7 @@ def do_vcs_check():
 		check1 = True
 
 	if os.access( os.path.join( LCD, ".git" ), os.R_OK | os.W_OK | os.X_OK ):
-		check2 = True	
+		check2 = True
 
 	if check1 and check2:
 		return 0
@@ -196,7 +196,7 @@ def do_vcs_init():
 	popen(cmd)
 
 ## 建立或移除 push2upload hook script
-# 
+#
 # 如果使用 USE_HOOK 選項時，會啟用 push2upload hook。
 #
 # @param enable	若是 True, 則開啟 git 的 hook 設定; 若False, 則移除 git 的 hook 設定
@@ -278,7 +278,7 @@ def check_vcs_incomming():
 	hash_for_merge = get_hash_from_branch( "for_merge" )
 	hash_intersect = get_base_hash_from_branches( "master", "for_merge" )
 
-	print ( ">>> for_merge = '%s', intersect='%s' " % (hash_for_merge, hash_intersect) ) 
+	print ( ">>> for_merge = '%s', intersect='%s' " % (hash_for_merge, hash_intersect) )
 
 	if hash_intersect != hash_for_merge and hash_for_merge != "" and hash_intersect != "":
 		if check_vcs_mergefailed( LCD, hash_for_merge ):
@@ -323,12 +323,12 @@ set ftp:list-options -a;
 set ftp:ssl-allow no;
 #set ftp:use-mdtm no
 #set ftp:timezone %s
-open ftp://%s:%s@%s || exit; 
+open ftp://%s:%s@%s || exit;
 lcd %s || exit;
 cd %s  || exit;
 mirror --reverse --dry-run --delete --verbose=3 --parallel=3 %s ;
-""" 
-	
+"""
+
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
 
@@ -351,7 +351,7 @@ mirror --reverse --dry-run --delete --verbose=3 --parallel=3 %s ;
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
-	
+
 	return retcode
 
 ## 將 git 的版本差異轉換成 lftp 的指令
@@ -359,7 +359,7 @@ mirror --reverse --dry-run --delete --verbose=3 --parallel=3 %s ;
 # 將 git 在兩個 commit 之間的差異清單，轉換成 lftp 的指令
 #
 # @param diff_output	差異檔案清單的輸出內容 ( ex: git diff --name-status
-# 
+#
 # @todo python3 的 Big5 中文檔名輸出結果跟 python2 不一致
 #
 def convert_diff_to_ftp_commands( diff_output ):
@@ -372,7 +372,7 @@ def convert_diff_to_ftp_commands( diff_output ):
 		if filename[0] == "\"" and filename[-1:] == "\"":
 			if isPython3():
 				## @todo python3 的輸出結果跟 python2 不一樣，待解的懸案
-				filename = bytes( filename[1:-1], 'utf-8').decode('unicode_escape') 
+				filename = bytes( filename[1:-1], 'utf-8').decode('unicode_escape')
 			else:
 				filename = filename[1:-1].decode('string_escape')
 
@@ -384,7 +384,7 @@ def convert_diff_to_ftp_commands( diff_output ):
 			result.append( "# unknow tag '%s' " % ( tag ) )
 
 	output = "\n".join( result )
-	
+
 	return output
 
 def do_ftp_upload2( old_rev, new_rev ):
@@ -394,7 +394,7 @@ def do_ftp_upload2( old_rev, new_rev ):
 
 	cmd =  "git diff --name-status %s %s" % ( old_rev, new_rev )
 	retcode, out, err = popen(cmd)
-	
+
 	upload_commands_text = convert_diff_to_ftp_commands( out )
 
 	script_tmpl = """\
@@ -403,12 +403,12 @@ set ftp:list-options -a;
 set ftp:ssl-allow no;
 #set ftp:use-mdtm no
 #set ftp:timezone %s
-open ftp://%s:%s@%s || exit; 
+open ftp://%s:%s@%s || exit;
 lcd %s || exit;
 cd %s  || exit;
-""" 
+"""
 	script_tmpl += upload_commands_text
-	
+
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD )
 	string2file( script_txt, script_file )
 
@@ -447,13 +447,13 @@ set ftp:list-options -a;
 set ftp:ssl-allow no;
 set ftp:use-mdtm no
 set ftp:timezone %s
-open ftp://%s:%s@%s || exit; 
+open ftp://%s:%s@%s || exit;
 lcd %s || exit;
 cd %s  || exit;
 mirror --ignore-time --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
 mirror --ignore-time --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
-""" 
-	
+"""
+
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
 	string2file( script_txt, script_file )
 
@@ -606,7 +606,7 @@ def main():
 		old_rev = get_hash_from_branch( "master" )
 		print ( "進行 merge ..." )
 		ret = do_vcs_merge()
-		if ret:	
+		if ret:
 			msg_patch_info = get_merged_list()
 			print( "Merged patch List:\n%s" % msg_patch_info )
 			print ( "Merge 成功，進行 ftp uploading ..." )
@@ -614,7 +614,7 @@ def main():
 			new_rev = get_hash_from_branch( "master" )
 			do_ftp_upload2( old_rev, new_rev )
 			print ( "檢查 local 跟 remote ftp 的檔案是否一致" )
-		
+
 			ret = do_ftp_sync_check()
 			if ret == 0:
 				print ( ">>> ftp sync 狀態一致 <<<" )
