@@ -18,6 +18,7 @@ import subprocess
 import tempfile
 import psutil
 import time
+import textwrap
 
 try:
 	import ConfigParser
@@ -28,10 +29,7 @@ except ImportError:
 SELF = os.path.realpath( __file__ )
 ROOT = os.path.dirname( SELF )
 SETTINGS_FILE = None
-
-TIMEZONE = os.getenv('TZ')
-if TIMEZONE == None :
-	TIMEZONE = ""
+TIMEZONE = os.getenv('TZ', default="")
 
 HOST     = ""
 USER     = ""
@@ -121,17 +119,17 @@ def do_ftp_download():
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
-	script_tmpl = """\
-debug 2
-set ftp:list-options -a;
-set ftp:ssl-allow no;
-#set ftp:use-mdtm no
-#set ftp:timezone %s
-open ftp://%s:%s@%s || exit;
-lcd %s || exit;
-cd %s  || exit;
-mirror --delete --verbose --parallel=3 %s ;
-"""
+	script_tmpl = textwrap.dedent("""\
+			debug 2
+			set ftp:list-options -a;
+			set ftp:ssl-allow no;
+			#set ftp:use-mdtm no
+			#set ftp:timezone %s
+			open ftp://%s:%s@%s || exit;
+			lcd %s || exit;
+			cd %s  || exit;
+			mirror --delete --verbose --parallel=3 %s ;
+			""")
 
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
@@ -209,13 +207,12 @@ def do_vcs_setup_hook(enable=True):
 		return -1
 
 	# Hook 直接執行 vcseedftp
-	# @todo async hook
-	hook_content = """\
-#!/bin/sh
-unset GIT_DIR
-( which at >/dev/null 2>&1 ) && ( echo "python %s %s" | at now ) && exit
-python %s %s
-""" % ( SELF, SETTINGS_FILE, SELF, SETTINGS_FILE )
+	hook_content = textwrap.dedent("""\
+			#!/bin/sh
+			unset GIT_DIR
+			( which at >/dev/null 2>&1 ) && ( echo "python %s %s" | at now ) && exit
+			python %s %s
+			""" % ( SELF, SETTINGS_FILE, SELF, SETTINGS_FILE ) )
 
 	string2file(hook_content, pathname)
 	# chmod u+x
@@ -317,17 +314,17 @@ def do_ftp_upload():
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
-	script_tmpl = """\
-debug 2
-set ftp:list-options -a;
-set ftp:ssl-allow no;
-#set ftp:use-mdtm no
-#set ftp:timezone %s
-open ftp://%s:%s@%s || exit;
-lcd %s || exit;
-cd %s  || exit;
-mirror --reverse --dry-run --delete --verbose=3 --parallel=3 %s ;
-"""
+	script_tmpl = textwrap.dedent("""\
+			debug 2
+			set ftp:list-options -a;
+			set ftp:ssl-allow no;
+			#set ftp:use-mdtm no
+			#set ftp:timezone %s
+			open ftp://%s:%s@%s || exit;
+			lcd %s || exit;
+			cd %s  || exit;
+			mirror --reverse --dry-run --delete --verbose=3 --parallel=3 %s ;
+			""")
 
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
@@ -397,16 +394,16 @@ def do_ftp_upload2( old_rev, new_rev ):
 
 	upload_commands_text = convert_diff_to_ftp_commands( out )
 
-	script_tmpl = """\
-debug 2
-set ftp:list-options -a;
-set ftp:ssl-allow no;
-#set ftp:use-mdtm no
-#set ftp:timezone %s
-open ftp://%s:%s@%s || exit;
-lcd %s || exit;
-cd %s  || exit;
-"""
+	script_tmpl = textwrap.dedent("""\
+			debug 2
+			set ftp:list-options -a;
+			set ftp:ssl-allow no;
+			#set ftp:use-mdtm no
+			#set ftp:timezone %s
+			open ftp://%s:%s@%s || exit;
+			lcd %s || exit;
+			cd %s  || exit;
+			""")
 	script_tmpl += upload_commands_text
 
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD )
@@ -441,18 +438,18 @@ def do_ftp_sync_check():
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
-	script_tmpl = """\
-debug 2
-set ftp:list-options -a;
-set ftp:ssl-allow no;
-set ftp:use-mdtm no
-set ftp:timezone %s
-open ftp://%s:%s@%s || exit;
-lcd %s || exit;
-cd %s  || exit;
-mirror --ignore-time --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
-mirror --ignore-time --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
-"""
+	script_tmpl = textwrap.dedent("""\
+			debug 2
+			set ftp:list-options -a;
+			set ftp:ssl-allow no;
+			set ftp:use-mdtm no
+			set ftp:timezone %s
+			open ftp://%s:%s@%s || exit;
+			lcd %s || exit;
+			cd %s  || exit;
+			mirror --ignore-time --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
+			mirror --ignore-time --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
+			""")
 
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
 	string2file( script_txt, script_file )
@@ -478,6 +475,7 @@ mirror --ignore-time --no-perms --no-umask --dry-run -R --delete --verbose --par
 	os.unlink( script_stderr )
 
 	return result
+
 
 ## 設定載入
 #
