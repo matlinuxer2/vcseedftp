@@ -210,7 +210,7 @@ def do_vcs_setup_hook(enable=True):
 	hook_content = textwrap.dedent("""\
 			#!/bin/sh
 			unset GIT_DIR
-			( which at >/dev/null 2>&1 ) && ( echo "python %s %s" | at now ) && exit
+			( which at >/dev/null 2>&1 ) && ( echo "python %s %s" | nohup at -m now & ) && exit
 			python %s %s
 			""" % ( SELF, SETTINGS_FILE, SELF, SETTINGS_FILE ) )
 
