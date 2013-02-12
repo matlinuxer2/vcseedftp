@@ -1,8 +1,9 @@
 run:
 	cp ../vcseedftp ./vcseedftp.py
-	make test03
-	make test02
 	make test01
+	make test02
+	make test03
+	make test04
 	rm ./vcseedftp.py *.pyc 
 	test -d __pycache__ && rm -r __pycache__
 
@@ -20,3 +21,8 @@ test03:
 	( which python  && python --version  && python  ./test03_ls_octal_name.py ) || true
 	( which python2 && python2 --version && python2 ./test03_ls_octal_name.py ) || true
 	( which python3 && python3 --version && python3 ./test03_ls_octal_name.py ) || true
+
+test04:
+	( which python  && python --version  && python  ./test04_list_timezone.py ) || true
+	( which python2 && python2 --version && python2 ./test04_list_timezone.py ) || true
+	( which python3 && python3 --version && python3 ./test04_list_timezone.py ) || true

@@ -37,6 +37,7 @@ PASS     = ""
 LCD      = ""
 RCD      = ""
 EXCL     = []
+FIND_TZ  = False
 FTP_PUSH = False
 USE_HOOK = False
 EXCLUDES = ""
@@ -52,6 +53,20 @@ def isPython3():
 		return True
 	else:
 		return False
+
+## 列出系統預設的 timezone 清單
+#
+# 列出系統預設的 timezone 清單
+#
+def listTimezones():
+	zoneinfo_path = "/usr/share/zoneinfo"
+	retcode, out, err = popen( "cd %s; find Etc -type f " % zoneinfo_path )
+	result = []
+	for item in out.split('\n'):
+		item_str = item.strip()
+		if item_str != "":
+			result.append( item_str )
+	return result
 
 ## 執行系統指令
 #
@@ -392,15 +407,12 @@ def convert_diff_to_ftp_commands( diff_output ):
 
 	return output
 
-def do_ftp_upload2( old_rev, new_rev ):
+def do_ftp_upload2( diff_output, ext=None ):
 	script_file = tempfile.mktemp()
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
-	cmd =  "git diff --name-status %s %s" % ( old_rev, new_rev )
-	retcode, out, err = popen(cmd)
-
-	upload_commands_text = convert_diff_to_ftp_commands( out )
+	upload_commands_text = convert_diff_to_ftp_commands( diff_output )
 
 	script_tmpl = textwrap.dedent("""\
 			debug 2
@@ -417,6 +429,9 @@ def do_ftp_upload2( old_rev, new_rev ):
 			cd %s  || exit;
 			""")
 	script_tmpl += upload_commands_text
+	if ext != None:
+		script_tmpl += "\n"
+		script_tmpl += ext
 
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD )
 	string2file( script_txt, script_file )
@@ -463,8 +478,8 @@ def do_ftp_sync_check():
 			open ftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
-			mirror --ignore-time --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
-			mirror --ignore-time --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
+			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
+			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
 			""")
 
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
@@ -492,6 +507,47 @@ def do_ftp_sync_check():
 
 	return result
 
+def do_ftp_detect_timezone():
+	global LCD, RCD, TIMEZONE
+	msgs = [] 
+
+	old_lcd, old_rcd, old_timezone = LCD, RCD, TIMEZONE
+
+	tmp_dir   = tempfile.mkdtemp()
+	tmp_file  = tempfile.mkstemp( dir = tmp_dir )
+	test_dir  = os.path.basename( tmp_dir )
+	test_file = os.path.basename( tmp_file[1] )
+
+	LCD = tempfile.tempdir
+	RCD = old_rcd
+	diff_out = "A	%s/%s" % ( test_dir, test_file )
+	do_ftp_upload2( diff_out )
+
+
+	LCD = tmp_dir
+	RCD = os.path.join( RCD, test_dir )
+	TZs = listTimezones()
+	for tz in TZs:
+		TIMEZONE = tz
+		ret = do_ftp_sync_check()
+		if ret == 0:
+			msgs.append( "%s [OK]" % TIMEZONE )
+		else:
+			msgs.append( "%s [Failed]" % TIMEZONE )
+
+	LCD = tempfile.tempdir
+	RCD = old_rcd
+	diff_out =  "D	%s/%s" % ( test_dir, test_file )
+	ext_out  =  "rmdir '%s'" % ( test_dir )
+	do_ftp_upload2( diff_out, ext=ext_out )
+
+	# 還原 LCD, RCD, TIMEZONE 的原始設定
+	LCD, RCD, TIMEZONE = old_lcd, old_rcd, old_timezone
+
+	os.unlink( tmp_file[1] )
+	os.rmdir( tmp_dir )
+
+	print( "\n".join( msgs ) )
 
 ## 設定載入
 #
@@ -514,6 +570,7 @@ def do_load_settings(path=None):
 	global LCD
 	global RCD
 	global EXCL
+	global FIND_TZ
 	global FTP_PUSH
 	global USE_HOOK
 	global EXCLUDES
@@ -584,9 +641,11 @@ def do_load_settings(path=None):
 				return True
 		return False
 
+	FIND_TZ  = _get_bool_value( 'vcseedftp', 'FIND_TZ' )
 	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
 	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
 
+	print("FIND_TZ  : %s" % FIND_TZ)
 	print("FTP_PUSH : %s" % FTP_PUSH)
 	print("USE_HOOK : %s" % USE_HOOK)
 	print("HOST     : %s" % HOST)
@@ -611,6 +670,9 @@ def main():
 	elif ret == 2:
 		do_vcs_init()
 
+	if FIND_TZ:
+		do_ftp_detect_timezone()
+
 	do_vcs_setup_hook( enable=USE_HOOK ) # 每次都執行
 	do_vcs_goto_branch( "master" )
 	do_ftp_download()
@@ -626,7 +688,9 @@ def main():
 			print ( "Merge 成功，進行 ftp uploading ..." )
 			#do_ftp_upload()
 			new_rev = get_hash_from_branch( "master" )
-			do_ftp_upload2( old_rev, new_rev )
+			cmd =  "git diff --name-status %s %s" % ( old_rev, new_rev )
+			_, diff_output, _ = popen(cmd)
+			do_ftp_upload2( diff_output )
 			print ( "檢查 local 跟 remote ftp 的檔案是否一致" )
 
 			ret = do_ftp_sync_check()
