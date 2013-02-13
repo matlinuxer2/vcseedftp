@@ -205,21 +205,25 @@ def get_raw_string(s):
 def get_decode_string_py3(py3_str):
 	"""decode octal string that contain multibyte charactor
 
-	>>> kogugai = '\\xe8\\xa8\\xb1\\xe5\\x8a\\x9f\\xe8\\x93\\x8b'
-	>>> m.get_decode_string_py3( kogugai)
-	'許功蓋'
+	>>> s = b'D\t"images/\\351\\246\\226\\351\\240\\201_08.jpg"\n'
+	>>> m.get_decode_string_py3(s.decode())
+	'D\t"images/首頁_08.jpg"\n'
 	"""
-	i, w = 0, bytearray()
+	i, b, w = 0, 0, bytearray()
 	for c in py3_str:
 		if c == '\\':
 			i = 3
-		elif i != 0: # in literal
-			if i == 3:
+		elif i <=3 and i > 0: # in literal
+			b = int(c,8)
+			if   i == 3 and b < 4:
 				pass
 			elif i == 2:
-				w.append(16 * int(c,16))
+				b = b + w.pop() * 8
 			elif i == 1:
-				w.append(w.pop() + int(c,16))
+				b = b + w.pop() * 8
+			else:
+				raise RuntimeError("Not octal")
+			w.append(b)
 			i = i - 1
 		else:
 			w.append(ord(c))
