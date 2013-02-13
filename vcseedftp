@@ -14,11 +14,13 @@
 
 import os
 import sys
-import subprocess
-import tempfile
-import psutil
 import time
+import psutil
+import logging
+import sqlite3
+import tempfile
 import textwrap
+import subprocess
 
 try:
 	import ConfigParser
@@ -28,8 +30,13 @@ except ImportError:
 
 SELF = os.path.realpath( __file__ )
 ROOT = os.path.dirname( SELF )
+CONFIG_HOME = os.path.join(os.getenv('XDG_CONFIG_HOME'), 'vcseedftp')
+if not os.path.exists(CONFIG_HOME):
+	os.makedirs(CONFIG_HOME)
+
 SETTINGS_FILE = None
 TIMEZONE = os.getenv('TZ', default="")
+BATCH_ID = time.time() # Timestamp
 
 HOST     = ""
 USER     = ""
@@ -42,12 +49,103 @@ FTP_PUSH = False
 USE_HOOK = False
 EXCLUDES = ""
 
+# Logger fallback for module usage.
+log = logging.getLogger()
+
+## VCSeedFTP Custom Logger
+#
+#  A logger wrapper have two handler to output to stdout and sqlite file.
+#
+#  Notice that sqlite will commit when exit program.
+#
+class Log(logging.Logger):
+	def __init__(self, name='vcseedftp'):
+		logging.Logger.__init__(self, name)
+		sql_hdl = SQLiteHandler('%s.log.sqlite' % name)
+		sql_hdl.setLevel( logging.INFO )
+		self.addHandler(sql_hdl)
+		strm_hdl = logging.StreamHandler()
+		strm_hdl.setLevel( logging.DEBUG )
+		self.addHandler(strm_hdl)
+
+
+## SQLite Handler
+#
+#	commit when `del` or context exit.
+#
+class SQLiteHandler(logging.Handler):
+	"""SQLite Handler"""
+
+	init_sql = """CREATE TABLE IF NOT EXISTS log(
+						Id int,
+						Created float,
+						Name text,
+						LogLevel text,
+						Message text,
+						Module text,
+						FuncName text,
+						LineNo int,
+						Exception text
+					);"""
+
+	log_sql = """INSERT INTO log(
+						Id,
+						Created,
+						Name,
+						LogLevel,
+						Message,
+						Module,
+						FuncName,
+						LineNo,
+						Exception
+					)
+					VALUES (
+						%(bid)d,
+						%(created).5f,
+						'%(name)s',
+						'%(levelname)s',
+						'%(_msg)s',
+						'%(module)s',
+						'%(funcName)s',
+						%(lineno)d,
+						'%(exc_text)s'
+					);"""
+
+	def __init__(self, db='vcseedftp.log.sqlite'):
+		logging.Handler.__init__(self)
+		self.db = os.path.join(CONFIG_HOME, db)
+		self.conn = sqlite3.connect(self.db)
+		self.conn.execute(self.init_sql)
+		self.conn.commit()
+		self.cursor = self.conn.cursor()
+
+	def __del__(self):
+		self.conn.commit()
+		self.cursor.close()
+		self.conn.close()
+
+	# for with clause usage
+	def __exit__(self, exc_type, exc_value, traceback):
+		self.__del__
+		if exc_type:
+			log.error(traceback)
+
+	def emit(self, record, bid=BATCH_ID):
+		record.bid = bid
+		self.format(record)
+		# escape for sql after format
+		record._msg = record.msg.replace("'", "''")
+		sql = self.log_sql % record.__dict__
+		self.cursor.execute(sql)
+		## comment it to commit once when exit
+		# self.conn.commit()
+
 
 ## 檢查是否是 python3
 #
 # 檢查是否是 python3
 #
-def isPython3():
+def is_python3():
 	major_version = sys.version_info[0]
 	if major_version == 3:
 		return True
@@ -80,13 +178,11 @@ def popen(cmd):
 	pipe = subprocess.Popen([ cmd ], shell=True, cwd=LCD, stdout = subprocess.PIPE, stderr = subprocess.PIPE )
 	(out, err) = pipe.communicate()
 
-	## for python3
-	if type( out ) == type( b"bytes" ):
-		out = str(out)
-
-	## for python3
-	if type( err ) == type( b"bytes" ):
-		err = str(err)
+	if is_python3():
+		# convert bytes to str in python3
+		out, err = map(lambda s: s.decode(errors='replace'), (out, err))
+	else:
+		out, err = map(str, (out, err))
 
 	return pipe.wait(), out, err
 
@@ -97,6 +193,13 @@ def file2string(path):
 def string2file(string, path):
 	with open(path, 'w') as f:
 		f.write(string)
+
+def get_raw_string(s):
+    if isinstance(s, str):
+        s = s.encode('string-escape')
+    elif isinstance(s, unicode):
+        s = s.encode('unicode-escape')
+    return s
 
 ## 檢查是否已有相同的程式在執行
 #
@@ -109,6 +212,7 @@ def check_process_running( conf_name ):
 	result = False
 
 	cur_pid = os.getpid() # 自己的 pid
+	prog_name = os.path.basename( __file__ )
 
 	for pid in psutil.get_pid_list():
 		try:
@@ -117,14 +221,13 @@ def check_process_running( conf_name ):
 		except:
 			continue
 
-		prog_name = os.path.basename( __file__ )
 		if pid != cur_pid and cmdline.__len__() >= 3:
 			check0 = ( cmdline[0].find( "python"  ) >=0 )
 			check1 = ( cmdline[1].find( prog_name ) >=0 )
 			check2 = ( cmdline[2].find( conf_name ) >=0 )
 
 			if check0 and check1 and check2:
-				print( "找到相同的程式已經在執行中 pid=%s ,\"%s\"" % ( pid, " ".join( cmdline )  ) )
+				log.warn( "找到相同的程式已經在執行中 pid=%s ,\"%s\"" % ( pid, " ".join( cmdline )  ) )
 				result = True
 
 	return result
@@ -156,19 +259,19 @@ def do_ftp_download():
 	cmd = "lftp -f %s" % ( script_file )
 	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )
 
-	print(cmd)
-	print(script_txt)
+	log.info(cmd)
+	log.info(script_txt)
 
 	retcode = proc.wait()
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
 	_, result, _ = popen(cmd)
-	print( result )
+	log.info( result )
 	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
 	_, result, _ = popen(cmd)
-	print( result )
+	log.info( result )
 
-	print("return code: %s" % retcode)
+	log.info("return code: %s" % retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
@@ -222,7 +325,7 @@ def do_vcs_setup_hook(enable=True):
 	pathname = os.path.join(LCD, '.git', 'hooks', 'post-receive')
 	if not enable and os.access( pathname, os.W_OK ):
 		os.remove(pathname)
-		print("Hook 已刪除")
+		log.info("Hook 已刪除")
 		return -1
 
 	# Hook 直接執行 vcseedftp
@@ -238,7 +341,7 @@ def do_vcs_setup_hook(enable=True):
 	import stat
 	st = os.stat(pathname)
 	os.chmod(pathname, st.st_mode | stat.S_IEXEC)
-	print("Hook 已建立")
+	log.info("Hook 已建立")
 	return 0
 
 def do_vcs_commit():
@@ -294,17 +397,17 @@ def check_vcs_incomming():
 	hash_for_merge = get_hash_from_branch( "for_merge" )
 	hash_intersect = get_base_hash_from_branches( "master", "for_merge" )
 
-	print ( ">>> for_merge = '%s', intersect='%s' " % (hash_for_merge, hash_intersect) )
+	log.info( ">>> for_merge = '%s', intersect = '%s' " % (hash_for_merge, hash_intersect) )
 
 	if hash_intersect != hash_for_merge and hash_for_merge != "" and hash_intersect != "":
 		if check_vcs_mergefailed( LCD, hash_for_merge ):
-			print ( ">>> Changeset %s of for_merge 曾經 merge failed, 跳過 merge" % (hash_for_merge) )
+			log.warn( ">>> Changeset %s of for_merge 曾經 merge failed, 跳過 merge" % (hash_for_merge) )
 			return False
 		else:
 			return True
 	else:
 		if hash_intersect == hash_for_merge:
-			print ( ">>> for_merge 的 HEAD 已在 master 的 changesets 裡，不需要再 merge " )
+			log.info( ">>> for_merge 的 HEAD 已在 master 的 changesets 裡，不需要再 merge " )
 		return False
 
 def do_vcs_reset():
@@ -321,7 +424,7 @@ def do_vcs_merge():
 	cmd = "git merge --ff-only for_merge"
 	retcode, out, err = popen(cmd)
 	if retcode != 0:
-		print("Merge 失敗, 原因: %s" % err.strip())
+		log.warn("Merge 失敗, 原因: %s" % err.strip())
 		cmd = "git merge --abort"
 		popen(cmd)
 		return False
@@ -355,19 +458,19 @@ def do_ftp_upload():
 	cmd = "lftp -f %s" % ( script_file )
 	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )
 
-	print(cmd)
-	print(script_txt)
+	log.info(cmd)
+	log.info(script_txt)
 
 	retcode = proc.wait()
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
 	_, result, _ = popen(cmd)
-	print( result )
+	log.info( result )
 	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
 	_, result, _ = popen(cmd)
-	print( result )
+	log.info( result )
 
-	print("return code: %s" % retcode)
+	log.info("return code: %s" % retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
@@ -390,7 +493,7 @@ def convert_diff_to_ftp_commands( diff_output ):
 		filename = line.split("\t")[1]
 
 		if filename[0] == "\"" and filename[-1:] == "\"":
-			if isPython3():
+			if is_python3():
 				## @todo python3 的輸出結果跟 python2 不一樣，待解的懸案
 				filename = bytes( filename[1:-1], 'utf-8').decode('unicode_escape')
 			else:
@@ -439,19 +542,19 @@ def do_ftp_upload2( diff_output, ext=None ):
 	cmd = "lftp -f %s" % ( script_file )
 	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )
 
-	print(cmd)
-	print(script_txt)
+	log.info(cmd)
+	log.info(script_txt)
 
 	retcode = proc.wait()
 
 	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
 	_, result, _ = popen(cmd)
-	print( result )
+	log.info( result )
 	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
 	_, result, _ = popen(cmd)
-	print( result )
+	log.info( result )
 
-	print("return code: %s" % retcode)
+	log.info("return code: %s" % retcode)
 	os.unlink( script_file )
 	os.unlink( script_stdout )
 	os.unlink( script_stderr )
@@ -488,15 +591,15 @@ def do_ftp_sync_check():
 	cmd = "lftp -f %s" % ( script_file )
 	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )
 
-	print(cmd)
-	print(script_txt)
+	log.info(cmd)
+	log.info(script_txt)
 
 	retcode = proc.wait()
 
-	print("return code: %s" % retcode)
+	log.info("return code: %s" % retcode)
 
 	difference_complain = file2string( script_stdout )
-	print( "difference_complain: %s" % difference_complain )
+	log.warn( "difference_complain: %s" % difference_complain )
 
 	if retcode == 0 and difference_complain == "":
 		result = 0
@@ -509,7 +612,7 @@ def do_ftp_sync_check():
 
 def do_ftp_detect_timezone():
 	global LCD, RCD, TIMEZONE
-	msgs = [] 
+	msgs = []
 
 	old_lcd, old_rcd, old_timezone = LCD, RCD, TIMEZONE
 
@@ -605,6 +708,7 @@ def do_ftp_detect_timezone():
 #   3. 函式引數 path
 #
 # 作為設定檔載入，沒有則結束程式
+# 並且重新設定 logger
 #
 # @param path 指定使用的設定檔路徑
 # @retval string 設定檔的路徑
@@ -640,20 +744,20 @@ def do_load_settings(path=None):
 		config.optionxform = str
 		config.read(SETTINGS_FILE)
 	else:
-		print("設定檔無法讀取: %s" % SETTINGS_FILE)
+		global log
+		log.error("設定檔無法讀取: %s" % SETTINGS_FILE)
 		exit()
 
 	# project_name is the first output line and indicate which .ini is processing
 	project_name = None
 	settings_name = os.path.basename(SETTINGS_FILE)
-	if settings_name == "vcseedftp.ini":
-			project_name = 'default'
-	elif settings_name.endswith('.ini'):
+	if settings_name.endswith('.ini'):
 			project_name = settings_name[:-4]
 	else:
 			project_name = settings_name
 
-	print("PROJECT  : %s" %  project_name)
+	log = Log(project_name)
+	log.info("PROJECT  : %s" %  project_name)
 
 	HOST     = config.get('lftp', 'HOST')
 	USER     = config.get('lftp', 'USER')
@@ -692,15 +796,16 @@ def do_load_settings(path=None):
 	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
 	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
 
-	print("FIND_TZ  : %s" % FIND_TZ)
-	print("FTP_PUSH : %s" % FTP_PUSH)
-	print("USE_HOOK : %s" % USE_HOOK)
-	print("HOST     : %s" % HOST)
-	print("USER     : %s" % USER)
-	print("PASS     : %s" % PASS)
-	print("LCD      : %s" % LCD)
-	print("RCD      : %s" % RCD)
-	print("EXCL     : %s" % EXCL)
+	log.info("FIND_TZ  : %s" % FIND_TZ)
+	log.info("FTP_PUSH : %s" % FTP_PUSH)
+	log.info("USE_HOOK : %s" % USE_HOOK)
+	log.info("HOST     : %s" % HOST)
+	log.info("USER     : %s" % USER)
+	log.info("PASS     : %s" % PASS)
+	log.info("LCD      : %s" % LCD)
+	log.info("RCD      : %s" % RCD)
+	log.info("EXCL     : %s" % EXCL)
+	log.info("EXCLUDES : %s" % EXCLUDES)
 
 	return SETTINGS_FILE
 
@@ -712,7 +817,7 @@ def do_load_settings(path=None):
 def main():
 	ret = do_vcs_check()
 	if ret == 1:
-		print("本地端目錄存取有誤: %s" % LCD)
+		log.error("本地端目錄存取有誤: %s" % LCD)
 		exit()
 	elif ret == 2:
 		do_vcs_init()
@@ -727,26 +832,26 @@ def main():
 
 	if FTP_PUSH and check_vcs_incomming():
 		old_rev = get_hash_from_branch( "master" )
-		print ( "進行 merge ..." )
+		log.info( "進行 merge ..." )
 		ret = do_vcs_merge()
 		if ret:
 			msg_patch_info = get_merged_list()
-			print( "Merged patch List:\n%s" % msg_patch_info )
-			print ( "Merge 成功，進行 ftp uploading ..." )
+			log.info( "Merged patch List:\n%s" % msg_patch_info )
+			log.info( "Merge 成功，進行 ftp uploading ..." )
 			#do_ftp_upload()
 			new_rev = get_hash_from_branch( "master" )
 			cmd =  "git diff --name-status %s %s" % ( old_rev, new_rev )
 			_, diff_output, _ = popen(cmd)
 			do_ftp_upload2( diff_output )
-			print ( "檢查 local 跟 remote ftp 的檔案是否一致" )
+			log.info( "檢查 local 跟 remote ftp 的檔案是否一致" )
 
 			ret = do_ftp_sync_check()
 			if ret == 0:
-				print ( ">>> ftp sync 狀態一致 <<<" )
+				log.info( ">>> ftp sync 狀態一致 <<<" )
 			else:
-				print ( "!!! local 跟 remote 檔案不一致 !!!" )
+				log.warn( "!!! local 跟 remote 檔案不一致 !!!" )
 		else:
-			print( "恢復資料中..." )
+			log.info( "恢復資料中..." )
 			do_vcs_reset()
 
 if __name__ == "__main__":
@@ -754,14 +859,20 @@ if __name__ == "__main__":
 	conf_name = os.path.basename( conf_path )
 
 	retry, sleep_sec = 3, 30
-	while True:
-		isRun = check_process_running( conf_name )
-		if isRun:
-			retry = retry - 1
-			if not retry:
-				print( "程式忙碌中，結束重試！" )
-				sys.exit(1)
-			print( "等待%d秒重試中..." % sleep_sec )
-			time.sleep(sleep_sec)
-		else:
-			sys.exit(main())
+	while check_process_running( conf_name ):
+		retry = retry - 1
+		if not retry:
+			log.warn( "程式忙碌中，結束重試！" )
+			sys.exit(1)
+		log.info( "等待%d秒重試中..." % sleep_sec )
+		time.sleep(sleep_sec)
+
+	try:
+		sys.exit(main())
+	except KeyboardInterrupt:
+		log.warn("使用者中斷執行。")
+		#TODO clean work tree
+	except Exception as e:
+		import traceback
+		exc_trace = traceback.format_exc()
+		log.error(exc_trace)
