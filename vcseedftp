@@ -201,6 +201,31 @@ def get_raw_string(s):
         s = s.encode('unicode-escape')
     return s
 
+# Multibyte octal string decoder for python3
+def get_decode_string_py3(py3_str):
+	"""decode octal string that contain multibyte charactor
+
+	>>> kogugai = '\\xe8\\xa8\\xb1\\xe5\\x8a\\x9f\\xe8\\x93\\x8b'
+	>>> m.get_decode_string_py3( kogugai)
+	'許功蓋'
+	"""
+	i, w = 0, bytearray()
+	for c in py3_str:
+		if c == '\\':
+			i = 3
+		elif i != 0: # in literal
+			if i == 3:
+				pass
+			elif i == 2:
+				w.append(16 * int(c,16))
+			elif i == 1:
+				w.append(w.pop() + int(c,16))
+			i = i - 1
+		else:
+			w.append(ord(c))
+
+	return w.decode()
+
 ## 檢查是否已有相同的程式在執行
 #
 # 檢查是否已有相同的程式在執行
@@ -487,17 +512,21 @@ def do_ftp_upload():
 #
 def convert_diff_to_ftp_commands( diff_output ):
 	result = []
+	is_py3 = is_python3()
+
+	log.debug(diff_output)
+	if is_py3:
+		diff_output = get_decode_string_py3(diff_output)
+	else:
+		diff_output = diff_output.decode('string_escape')
+	log.debug(diff_output)
 
 	for line in diff_output.strip().split('\n'):
 		tag      = line.split("\t")[0]
 		filename = line.split("\t")[1]
 
 		if filename[0] == "\"" and filename[-1:] == "\"":
-			if is_python3():
-				## @todo python3 的輸出結果跟 python2 不一樣，待解的懸案
-				filename = bytes( filename[1:-1], 'utf-8').decode('unicode_escape')
-			else:
-				filename = filename[1:-1].decode('string_escape')
+				filename = filename[1:-1]
 
 		if tag == "A" or tag == "M":
 			result.append( "mput -d '%s' " % ( filename ) ) # use mput to create leading directory smartly
@@ -507,6 +536,7 @@ def convert_diff_to_ftp_commands( diff_output ):
 			result.append( "# unknow tag '%s' " % ( tag ) )
 
 	output = "\n".join( result )
+	log.debug(output)
 
 	return output
 
