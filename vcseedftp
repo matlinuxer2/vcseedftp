@@ -527,13 +527,60 @@ def do_ftp_detect_timezone():
 	LCD = tmp_dir
 	RCD = os.path.join( RCD, test_dir )
 	TZs = listTimezones()
+	ext_txt = ""
 	for tz in TZs:
-		TIMEZONE = tz
-		ret = do_ftp_sync_check()
-		if ret == 0:
-			msgs.append( "%s [OK]" % TIMEZONE )
+		ext_txt += textwrap.dedent( """\
+			echo '>>> %s '
+			set ftp:timezone %s
+			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5;
+			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5;
+			echo '<<< %s '
+			""") % ( tz, tz, tz )
+
+	script_file = tempfile.mktemp()
+	script_stdout = script_file + ".log"
+	script_stderr = script_file + ".err"
+	script_tmpl = textwrap.dedent("""\
+			debug 2
+			set ftp:list-options -a;
+			set ftp:ssl-allow no;
+			set ftp:use-mdtm no
+			set ftp:timezone %s
+			set net:timeout 10
+			set net:max-retries 2
+			set net:reconnect-interval-base 5
+			set net:reconnect-interval-multiplier 1
+			open ftp://%s:%s@%s || exit;
+			lcd %s || exit;
+			cd %s  || exit;
+			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
+			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
+			""")
+
+	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
+	script_txt += ext_txt
+	string2file( script_txt, script_file )
+
+	cmd = "lftp -f %s" % ( script_file )
+	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )
+
+	print(cmd)
+	print(script_txt)
+
+	retcode = proc.wait()
+	print("return code: %s" % retcode)
+
+	for tz in TZs:
+		_, out, _ = popen( "cat %s | grep -A 999 '^>>> %s' | tail -n +2 | grep -B 999 '^<<< %s' | head -n -1 " % ( script_stdout, tz, tz) )
+		print ( tz, out )
+		if out.strip() == "":
+			msgs.append( "%s [OK]" % (tz) )
 		else:
-			msgs.append( "%s [Failed]" % TIMEZONE )
+			msgs.append( "%s [Failed]" % (tz) )
+
+	os.unlink( script_file )
+	os.unlink( script_stdout )
+	os.unlink( script_stderr )
 
 	LCD = tempfile.tempdir
 	RCD = old_rcd
