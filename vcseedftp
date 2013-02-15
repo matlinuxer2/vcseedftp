@@ -30,6 +30,9 @@ except ImportError:
 
 SELF = os.path.realpath( __file__ )
 ROOT = os.path.dirname( SELF )
+
+if os.getenv('XDG_CONFIG_HOME') == None:
+	os.environ['XDG_CONFIG_HOME'] = os.path.join( os.getenv('HOME'),".config" )
 CONFIG_HOME = os.path.join(os.getenv('XDG_CONFIG_HOME'), 'vcseedftp')
 if not os.path.exists(CONFIG_HOME):
 	os.makedirs(CONFIG_HOME)
@@ -228,7 +231,7 @@ def get_decode_string_py3(py3_str):
 		else:
 			w.append(ord(c))
 
-	return w.decode()
+	return w.decode('utf-8','replace')
 
 ## 檢查是否已有相同的程式在執行
 #
