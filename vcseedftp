@@ -37,9 +37,14 @@ CONFIG_HOME = os.path.join(os.getenv('XDG_CONFIG_HOME'), 'vcseedftp')
 if not os.path.exists(CONFIG_HOME):
 	os.makedirs(CONFIG_HOME)
 
+LOG_ROOT = os.path.join( CONFIG_HOME, "logs" )
+if not os.path.exists(LOG_ROOT):
+	os.makedirs(LOG_ROOT)
+
 SETTINGS_FILE = None
 TIMEZONE = os.getenv('TZ', default="")
 BATCH_ID = time.time() # Timestamp
+BATCH_ID_TIME_STR = time.strftime( '%Y-%m-%d %H:%M:%S', time.localtime( BATCH_ID ) )
 
 HOST     = ""
 USER     = ""
@@ -143,6 +148,45 @@ class SQLiteHandler(logging.Handler):
 		## comment it to commit once when exit
 		# self.conn.commit()
 
+## 取得專案的名稱
+#
+# 取得專案的名稱
+#
+# @retval name	回傳值為 str
+#
+def get_project_name():
+	global SETTINGS_FILE
+
+	project_name = None
+	settings_name = os.path.basename(SETTINGS_FILE)
+	if settings_name.endswith('.ini'):
+			project_name = settings_name[:-4]
+	else:
+			project_name = settings_name
+
+	return project_name
+
+## 自動產生不重複的 log 檔檔名
+#
+# 自動產生不重複的 log 檔檔名
+#
+# @param title	主題
+# @retval name	回傳值為 str
+#
+cnt = 1
+def gen_filepath_for_logs( title ):
+	global cnt
+	project_name = get_project_name()
+	filename = "_".join( [ BATCH_ID_TIME_STR, str(cnt).zfill(3), title ] )
+	result = os.path.join( LOG_ROOT, project_name, BATCH_ID_TIME_STR, filename )
+
+	### @todo: dirty hack, 之後找機會拿掉
+	dir_path = os.path.abspath( os.path.dirname( result ) )
+	if not os.path.exists(dir_path):
+		os.makedirs(dir_path)
+
+	cnt += 1
+	return result
 
 ## 檢查是否是 python3
 #
@@ -265,7 +309,7 @@ def check_process_running( conf_name ):
 	return result
 
 def do_ftp_download():
-	script_file = tempfile.mktemp()
+	script_file = gen_filepath_for_logs( "do_ftp_download" )
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
@@ -304,9 +348,6 @@ def do_ftp_download():
 	log.info( result )
 
 	log.info("return code: %s" % retcode)
-	os.unlink( script_file )
-	os.unlink( script_stdout )
-	os.unlink( script_stderr )
 
 	return retcode
 
@@ -464,7 +505,7 @@ def do_vcs_merge():
 		return True
 
 def do_ftp_upload():
-	script_file = tempfile.mktemp()
+	script_file = gen_filepath_for_logs( "do_ftp_upload" )
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
@@ -503,9 +544,6 @@ def do_ftp_upload():
 	log.info( result )
 
 	log.info("return code: %s" % retcode)
-	os.unlink( script_file )
-	os.unlink( script_stdout )
-	os.unlink( script_stderr )
 
 	return retcode
 
@@ -548,7 +586,7 @@ def convert_diff_to_ftp_commands( diff_output ):
 	return output
 
 def do_ftp_upload2( diff_output, ext=None ):
-	script_file = tempfile.mktemp()
+	script_file = gen_filepath_for_logs( "do_ftp_upload2" )
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
@@ -592,16 +630,13 @@ def do_ftp_upload2( diff_output, ext=None ):
 	log.info( result )
 
 	log.info("return code: %s" % retcode)
-	os.unlink( script_file )
-	os.unlink( script_stdout )
-	os.unlink( script_stderr )
 
 	return retcode
 
 def do_ftp_sync_check():
 	result = -1
 
-	script_file = tempfile.mktemp()
+	script_file = gen_filepath_for_logs( "do_ftp_sync_check" )
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
@@ -641,10 +676,6 @@ def do_ftp_sync_check():
 	if retcode == 0 and difference_complain == "":
 		result = 0
 
-	os.unlink( script_file )
-	os.unlink( script_stdout )
-	os.unlink( script_stderr )
-
 	return result
 
 def do_ftp_detect_timezone():
@@ -677,7 +708,7 @@ def do_ftp_detect_timezone():
 			echo '<<< %s '
 			""") % ( tz, tz, tz )
 
-	script_file = tempfile.mktemp()
+	script_file = gen_filepath_for_logs( "do_ftp_detect_timezone" )
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 	script_tmpl = textwrap.dedent("""\
@@ -717,10 +748,6 @@ def do_ftp_detect_timezone():
 			msgs.append( "%s [OK]" % (tz) )
 		else:
 			msgs.append( "%s [Failed]" % (tz) )
-
-	os.unlink( script_file )
-	os.unlink( script_stdout )
-	os.unlink( script_stderr )
 
 	LCD = tempfile.tempdir
 	RCD = old_rcd
@@ -786,13 +813,7 @@ def do_load_settings(path=None):
 		exit()
 
 	# project_name is the first output line and indicate which .ini is processing
-	project_name = None
-	settings_name = os.path.basename(SETTINGS_FILE)
-	if settings_name.endswith('.ini'):
-			project_name = settings_name[:-4]
-	else:
-			project_name = settings_name
-
+	project_name = get_project_name()
 	log = Log(project_name)
 	log.info("PROJECT  : %s" %  project_name)
 
