@@ -45,7 +45,7 @@ if not os.path.exists(LOG_ROOT):
 SETTINGS_FILE = None
 TIMEZONE = os.getenv('TZ', default="")
 BATCH_ID = time.time() # Timestamp
-BATCH_ID_TIME_STR = time.strftime( '%Y-%m-%d %H:%M:%S', time.localtime( BATCH_ID ) )
+BATCH_ID_TIME_STR = time.strftime( '%Y-%m-%d_%H:%M:%S', time.localtime( BATCH_ID ) )
 
 HOST     = ""
 USER     = ""
@@ -344,10 +344,10 @@ def do_ftp_download():
 
 	retcode = proc.wait()
 
-	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
+	cmd = "echo ==== %s ==== ; cat \"%s\" " % ( script_stdout, script_stdout )
 	_, result, _ = popen(cmd)
 	log.info( result )
-	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
+	cmd = "echo ==== %s ==== ; cat \"%s\" | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
 	_, result, _ = popen(cmd)
 	log.info( result )
 
@@ -540,10 +540,10 @@ def do_ftp_upload():
 
 	retcode = proc.wait()
 
-	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
+	cmd = "echo ==== %s ==== ; cat \"%s\" " % ( script_stdout, script_stdout )
 	_, result, _ = popen(cmd)
 	log.info( result )
-	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
+	cmd = "echo ==== %s ==== ; cat \"%s\" | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
 	_, result, _ = popen(cmd)
 	log.info( result )
 
@@ -626,10 +626,10 @@ def do_ftp_upload2( diff_output, ext=None ):
 
 	retcode = proc.wait()
 
-	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
+	cmd = "echo ==== %s ==== ; cat \"%s\" " % ( script_stdout, script_stdout )
 	_, result, _ = popen(cmd)
 	log.info( result )
-	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
+	cmd = "echo ==== %s ==== ; cat \"%s\" | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
 	_, result, _ = popen(cmd)
 	log.info( result )
 
@@ -746,7 +746,7 @@ def do_ftp_detect_timezone():
 	print("return code: %s" % retcode)
 
 	for tz in TZs:
-		_, out, _ = popen( "cat %s | grep -A 999 '^>>> %s' | tail -n +2 | grep -B 999 '^<<< %s' | head -n -1 " % ( script_stdout, tz, tz) )
+		_, out, _ = popen( "cat \"%s\" | grep -A 999 '^>>> %s' | tail -n +2 | grep -B 999 '^<<< %s' | head -n -1 " % ( script_stdout, tz, tz) )
 		print ( tz, out )
 		if out.strip() == "":
 			msgs.append( "%s [OK]" % (tz) )
