@@ -18,9 +18,9 @@ def write_all_mail_to_logs(mbox_path='mbox', output_path='logs'):
 
 def list_filenames_from_logs_dir(path='logs'):
 	import json, subprocess
-	#path = os.path.realpath(path) 
+	#path = os.path.realpath(path)
 	file_list = subprocess.check_output(['/bin/sh','-c', 'cd %s; find . ' % path ])
-	filenames = json.dumps( sorted(file_list.strip().split('\n')) )
+	filenames = json.dumps( sorted(file_list.strip().split('\n'), reverse=True), indent=4 )
 	index_template = """<!DOCTYPE html><html><head><title>VCSeedFTP Log View</title>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 <link rel="stylesheet" href="http://necolas.github.com/normalize.css/2.1.0/normalize.css">
