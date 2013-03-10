@@ -233,14 +233,31 @@ def popen(cmd):
 
 	return pipe.wait(), out, err
 
+## 讀取檔案內容後以字串回傳
+#
+# 讀取檔案內容後以字串回傳
+#
+# @param path		檔案的路徑
+# @retval string	檔案的內容
+#
 def file2string(path):
 	with open(path) as f:
 		return f.read()
 
+## 將字串內容存入檔案
+#
+# 將字串內容存入檔案
+#
+# @param string		要儲存的字串內容
+# @param path		檔案的路徑
+#
 def string2file(string, path):
 	with open(path, 'w') as f:
 		f.write(string)
 
+## 取得字串之原始型態資料
+# @deprecated 好像沒用到?
+#
 def get_raw_string(s):
     if isinstance(s, str):
         s = s.encode('string-escape')
@@ -248,7 +265,12 @@ def get_raw_string(s):
         s = s.encode('unicode-escape')
     return s
 
+## Multibyte octal string decoder for python3
+#
 # Multibyte octal string decoder for python3
+#
+# @param py3_str	含有8進位表示法的字串 in python3
+#
 def get_decode_string_py3(py3_str):
 	"""decode octal string that contain multibyte charactor
 
