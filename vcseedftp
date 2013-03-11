@@ -334,6 +334,10 @@ def check_process_running( conf_name ):
 
 	return result
 
+## 鏡像下載 ftp server 遠端目錄的檔案至本地端目錄
+#
+# 鏡像下載 ftp server 遠端目錄的檔案至本地端目錄
+#
 def do_ftp_download():
 	script_file = gen_filepath_for_logs( "do_ftp_download" )
 	script_stdout = script_file + ".log"
@@ -377,12 +381,23 @@ def do_ftp_download():
 
 	return retcode
 
+## 切換版本控制至某一個 branch
+#
+# @param br		欲切換到的目標分支
+# @retval integer	目前是回傳 git 執行命令的回傳值
+#
 def do_vcs_goto_branch( br ):
 	cmd = "git checkout %s " % ( br )  ## 不要用 --force ，如此會打亂 timestamp，而造成 lftp 重複 mirror
 	retcode, out, err = popen(cmd)
 
 	return retcode
 
+## 檢查本地端目錄是否已經設定有版本控制
+#
+# 檢查本地端目錄是否已經設定有版本控制
+#
+# @retval integer	0, 有; 1, 目錄不ok; 2, 沒設定git ; 3, 其他問題
+#
 def do_vcs_check():
 	check1 = False
 	check2 = False
@@ -443,13 +458,26 @@ def do_vcs_setup_hook(enable=True):
 	log.info("Hook 已建立")
 	return 0
 
+## commit 一個版本
+#
+# 將目前的狀態 commit 成一個版本
+# 註: 若沒有變動，則不會產生新版本
+#
 def do_vcs_commit():
 	cmd = "git add --all; "
 	cmd += "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m \"*\" "
 	popen(cmd)
 
+## 檢查是否曾經 merge 失敗過
+#
+# 這個函式會檢查指定的版本, 看是否曾經和目前的 branch 作過 merge 失敗過。
+# 註: 這個函式主要是用來作 merge 前的檢查，避免重覆執行曾經失敗的 merge
+#
+# @param lcd		版本控制的根目錄
+# @param hash_for_merge	要檢查的 merge 目標版號
+# @retval boolean	True, 曾經失敗過; False, 沒有失敗過
+#
 def check_vcs_mergefailed( lcd, hash_for_merge ):
-
 	cmd = "cat ~/.vcseedftp-mergefail.log | grep \"%s\t%s\" " % ( lcd, hash_for_merge )
 	retcode, out, err = popen(cmd)
 	if retcode == 0:
@@ -458,6 +486,13 @@ def check_vcs_mergefailed( lcd, hash_for_merge ):
 	else:
 		return False
 
+## 取得某一個 branch 的 head 版號
+#
+# 取得某一個 branch 的 head 版號
+#
+# @param br		要抓取的 branch
+# @retval string	版號，7個字完的字串，即 git 的版號顯示
+#
 def get_hash_from_branch( br ):
 	result = ""
 
@@ -468,6 +503,14 @@ def get_hash_from_branch( br ):
 
 	return result
 
+## 取得某2個 branch 的共用基礎版號
+#
+# 作 merge 時，會先比對2個 branch 的基礎交集。這個函式是用來取得 2 個 branch 的共同基礎交集版號
+#
+# @param br1		要比對的 branch 之一
+# @param br2		要比對的 branch 另一個
+# @retval string	版號，7個字完的字串，即 git 的版號顯示
+#
 def get_base_hash_from_branches( br1, br2 ):
 	result = ""
 
@@ -478,6 +521,12 @@ def get_base_hash_from_branches( br1, br2 ):
 
 	return result
 
+## 取得上一次 merge 作業中，所 merge 的版本有那些
+#
+# 取得上一次 merge 作業中，所 merge 的版本有那些
+#
+# @retval string	一段以文本格式顯示版本 log 的內容
+#
 def get_merged_list():
 	"""return hash and log of commits from last merge line by line
 	"""
@@ -488,6 +537,13 @@ def get_merged_list():
 	_, result, _ = popen(cmd)
 	return result
 
+## 檢查是否有新進可 merge 的版本
+#
+# 檢查 for_merge 的分支，看是否有尚未 merge 過的新進版本。
+# 註: 若有 merge 失敗，也顯示相關錯誤訊息。
+#
+# @retval boolean	True, 有新進可 merge 的版本; False, 無新進可 merge 的版本
+#
 def check_vcs_incomming():
 
 	hash_for_merge = "" # branch == "for_merge" 的 hash
@@ -509,6 +565,11 @@ def check_vcs_incomming():
 			log.info( ">>> for_merge 的 HEAD 已在 master 的 changesets 裡，不需要再 merge " )
 		return False
 
+## reset 回復到動作前狀態
+#
+# 將目前的 repository 回復到操作前的狀態
+# 註: 主要是用在 merge 失敗後的回復動作。
+#
 def do_vcs_reset():
 	# get for_merge commit hash
 	for_merge_hash = get_hash_from_branch( "for_merge" )
@@ -517,6 +578,10 @@ def do_vcs_reset():
 	cmd += "echo \"%s\t%s\" >> ~/.vcseedftp-mergefail.log" % (LCD, for_merge_hash)
 	popen(cmd)
 
+## 執行對 for_merge 分支 merge 的動作
+#
+# 對 for_merge 執行 merge 的動作。只作 fast-forward 的 merge，以確保理想的 merge 狀態。
+#
 def do_vcs_merge():
 	"""merge `for_merge' branch to master branch"""
 
@@ -530,6 +595,12 @@ def do_vcs_merge():
 	else:
 		return True
 
+## 將本地端的目錄上傳至 ftp server 上的遠端目錄
+#
+# 將本地端的目錄上傳至 ftp server 上的遠端目錄
+# 註: 這個函式是以 lftp 的 mirror --reverse --delete 的方式為主，可能會刪除遠端的部份目錄。要非常小心使用
+# 註2: 一般上傳建議以 do_ftp_upload2() 為主
+#
 def do_ftp_upload():
 	script_file = gen_filepath_for_logs( "do_ftp_upload" )
 	script_stdout = script_file + ".log"
@@ -611,6 +682,14 @@ def convert_diff_to_ftp_commands( diff_output ):
 
 	return output
 
+## 將指定的差異部份，由本地端的目錄上傳至 ftp server 上的遠端目錄
+#
+# 這函式會讀取並分析 git diff --name-status 的格式，針對差異的部份作 ftp 上傳的動作。是很酷的功能。
+# 註: 若遠端目錄，沒有對應的 parent 目錄，會自動建立對應的 parent 目錄
+#
+# @param	diff_output	字串，用來輸入 git diff --name-status 的輸出內容
+# @param	ext		額外的 lftp 指令
+#
 def do_ftp_upload2( diff_output, ext=None ):
 	script_file = gen_filepath_for_logs( "do_ftp_upload2" )
 	script_stdout = script_file + ".log"
@@ -659,6 +738,12 @@ def do_ftp_upload2( diff_output, ext=None ):
 
 	return retcode
 
+## 檢查本地端與遠端的目錄是否同步
+#
+# 這函式會連線 ftp server，用 dry-run 的 upload/download 來檢查是否同步。
+#
+# @retval	integer		0, 同步; <>0, 不同步
+#
 def do_ftp_sync_check():
 	result = -1
 
@@ -704,6 +789,11 @@ def do_ftp_sync_check():
 
 	return result
 
+## 偵測某 ftp server 的時區設定
+#
+# 不同的 ftp server 會有不同的 timezone 設定，這會影響到 ftp 上下傳的時間正確性及比對的速度。
+# 註: 目前來用偵測的時區列表，是以 Linux 為主的時間列表
+#
 def do_ftp_detect_timezone():
 	global LCD, RCD, TIMEZONE
 	msgs = []
@@ -896,6 +986,7 @@ def do_load_settings(path=None):
 ## 主程式
 #
 # 作為執行檔時會執行的主程式
+# 註: 以程式的主體功能跟作業流程 (SOP) 為主
 # 需先 do_load_settings()
 #
 def main():
@@ -938,6 +1029,11 @@ def main():
 			log.info( "恢復資料中..." )
 			do_vcs_reset()
 
+## 執行檔載入執行
+#
+# 依作業系統及作業環境作載入與執行
+# 註: 以 process/env/debug/daemon... 等 OS 相關的 deployment 處理為主
+#
 if __name__ == "__main__":
 	conf_path = do_load_settings()
 	conf_name = os.path.basename( conf_path )
