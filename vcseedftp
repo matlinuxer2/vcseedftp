@@ -56,6 +56,7 @@ EXCL     = []
 FIND_TZ  = False
 FTP_PUSH = False
 USE_HOOK = False
+FOR_MERGE = ""
 EXCLUDES = ""
 
 # Logger fallback for module usage.
@@ -423,10 +424,11 @@ def do_vcs_check():
 #  初始化 git repository 和建立 `for_merge` branch
 #
 def do_vcs_init():
+	global FOR_MERGE
 	cmd = "git init; touch .gitignore; "
 	cmd += "git add --all; "
 	cmd += "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m init; "
-	cmd += "git branch for_merge master"
+	cmd += "git branch %s master" % ( FOR_MERGE )
 	popen(cmd)
 
 ## 建立或移除 push2upload hook script
@@ -530,10 +532,11 @@ def get_base_hash_from_branches( br1, br2 ):
 def get_merged_list():
 	"""return hash and log of commits from last merge line by line
 	"""
-	hash_pre_formerge	= get_hash_from_branch( "for_merge^" )
+	global FOR_MERGE
+	hash_pre_formerge	= get_hash_from_branch( FOR_MERGE+"^" )
 	hash_pre_master 	= get_hash_from_branch( "master^" )
 	hash_base 			= get_base_hash_from_branches(hash_pre_formerge, hash_pre_master)
-	cmd = "git log --not --pretty='%h %s' for_merge..{0}".format(hash_base)
+	cmd = "git log --not --pretty='%h %s' "+FOR_MERGE+"..{0}".format(hash_base)
 	_, result, _ = popen(cmd)
 	return result
 
@@ -545,12 +548,12 @@ def get_merged_list():
 # @retval boolean	True, 有新進可 merge 的版本; False, 無新進可 merge 的版本
 #
 def check_vcs_incomming():
-
+	global FOR_MERGE
 	hash_for_merge = "" # branch == "for_merge" 的 hash
 	hash_intersect = "" # "for_merge" 跟 "master" 分支共同交集的 hash
 
-	hash_for_merge = get_hash_from_branch( "for_merge" )
-	hash_intersect = get_base_hash_from_branches( "master", "for_merge" )
+	hash_for_merge = get_hash_from_branch( FOR_MERGE )
+	hash_intersect = get_base_hash_from_branches( "master", FOR_MERGE )
 
 	log.info( ">>> for_merge = '%s', intersect = '%s' " % (hash_for_merge, hash_intersect) )
 
@@ -571,8 +574,9 @@ def check_vcs_incomming():
 # 註: 主要是用在 merge 失敗後的回復動作。
 #
 def do_vcs_reset():
+	global FOR_MERGE
 	# get for_merge commit hash
-	for_merge_hash = get_hash_from_branch( "for_merge" )
+	for_merge_hash = get_hash_from_branch( FOR_MERGE )
 	cmd =  "git reset --hard;"
 	#cmd += "git clean -df;" # 先不能執行 git clean, 不然 mirror --delete --reverse 會刪掉某些 untrack 的資料目錄
 	cmd += "echo \"%s\t%s\" >> ~/.vcseedftp-mergefail.log" % (LCD, for_merge_hash)
@@ -583,9 +587,10 @@ def do_vcs_reset():
 # 對 for_merge 執行 merge 的動作。只作 fast-forward 的 merge，以確保理想的 merge 狀態。
 #
 def do_vcs_merge():
+	global FOR_MERGE
 	"""merge `for_merge' branch to master branch"""
 
-	cmd = "git merge --ff-only for_merge"
+	cmd = "git merge --ff-only %s" % ( FOR_MERGE )
 	retcode, out, err = popen(cmd)
 	if retcode != 0:
 		log.warn("Merge 失敗, 原因: %s" % err.strip())
@@ -904,6 +909,7 @@ def do_load_settings(path=None):
 	global FIND_TZ
 	global FTP_PUSH
 	global USE_HOOK
+	global FOR_MERGE
 	global EXCLUDES
 	global SETTINGS_FILE
 	config = None
@@ -969,10 +975,15 @@ def do_load_settings(path=None):
 	FIND_TZ  = _get_bool_value( 'vcseedftp', 'FIND_TZ' )
 	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
 	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
+	if config.has_option( 'vcseedftp', 'FOR_MERGE' ):
+		FOR_MERGE = config.get('vcseedftp', 'FOR_MERGE').strip()
+	if FOR_MERGE == "":
+		FOR_MERGE = "for_merge" # 預設使用 "for_merge" 為 branch 名稱
 
 	log.info("FIND_TZ  : %s" % FIND_TZ)
 	log.info("FTP_PUSH : %s" % FTP_PUSH)
 	log.info("USE_HOOK : %s" % USE_HOOK)
+	log.info("FOR_MERGE: %s" % FOR_MERGE)
 	log.info("HOST     : %s" % HOST)
 	log.info("USER     : %s" % USER)
 	log.info("PASS     : %s" % PASS)
