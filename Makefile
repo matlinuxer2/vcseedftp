@@ -2,7 +2,7 @@ update:
 	git pull; git push -f ; 
 
 run:
-	ps aux | grep 'vcseedftp' | grep -v 'grep' | grep -v '/bin/sh -c cd' || for ini in `find . -type f -name '*.ini' | sort `; do ./vcseedftp $$ini; done
+	ps aux | grep 'vcseedftp' | grep -v 'grep' | grep -v '/bin/sh -c cd' | grep -v 'git-upload-pack' || for ini in `find . -type f -name '*.ini' | sort `; do ./vcseedftp $$ini; done
 
 cron:
 	git checkout master;
@@ -14,7 +14,7 @@ cron:
 	rm -v cron.txt
 
 mkdir:
-	for x in `grep LCD *.ini | awk '{print $$3}'`;do install -v -d $$x;done
+	for x in `find . -type f -name '*.ini'| xargs grep LCD | awk '{print $$3}'`;do install -v -d $$x;done
 
 kill:
 	ps aux | grep 'make run'           | grep -v 'grep' | awk '{print $$2}' | xargs kill
