@@ -57,6 +57,7 @@ FIND_TZ  = False
 FTP_PUSH = False
 USE_HOOK = False
 FOR_MERGE = ""
+BR_MASTER = ""
 EXCLUDES = ""
 
 # Logger fallback for module usage.
@@ -425,10 +426,12 @@ def do_vcs_check():
 #
 def do_vcs_init():
 	global FOR_MERGE
+	global BR_MASTER
 	cmd = "git init; touch .gitignore; "
 	cmd += "git add --all; "
 	cmd += "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m init; "
-	cmd += "git branch %s master" % ( FOR_MERGE )
+	cmd += "git branch -m %s; " % ( BR_MASTER )
+	cmd += "git branch %s %s; " % ( FOR_MERGE, BR_MASTER )
 	popen(cmd)
 
 ## 建立或移除 push2upload hook script
@@ -533,8 +536,9 @@ def get_merged_list():
 	"""return hash and log of commits from last merge line by line
 	"""
 	global FOR_MERGE
+	global BR_MASTER
 	hash_pre_formerge	= get_hash_from_branch( FOR_MERGE+"^" )
-	hash_pre_master 	= get_hash_from_branch( "master^" )
+	hash_pre_master 	= get_hash_from_branch( BR_MASTER+"^" )
 	hash_base 			= get_base_hash_from_branches(hash_pre_formerge, hash_pre_master)
 	cmd = "git log --not --pretty='%h %s' "+FOR_MERGE+"..{0}".format(hash_base)
 	_, result, _ = popen(cmd)
@@ -549,11 +553,12 @@ def get_merged_list():
 #
 def check_vcs_incomming():
 	global FOR_MERGE
+	global BR_MASTER 
 	hash_for_merge = "" # branch == "for_merge" 的 hash
 	hash_intersect = "" # "for_merge" 跟 "master" 分支共同交集的 hash
 
 	hash_for_merge = get_hash_from_branch( FOR_MERGE )
-	hash_intersect = get_base_hash_from_branches( "master", FOR_MERGE )
+	hash_intersect = get_base_hash_from_branches( BR_MASTER, FOR_MERGE )
 
 	log.info( ">>> for_merge = '%s', intersect = '%s' " % (hash_for_merge, hash_intersect) )
 
@@ -856,19 +861,19 @@ def do_ftp_detect_timezone():
 	cmd = "lftp -f %s" % ( script_file )
 	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )
 
-	print(cmd)
-	print(script_txt)
+	#print(cmd)
+	#print(script_txt)
 
 	retcode = proc.wait()
 	print("return code: %s" % retcode)
 
 	for tz in TZs:
 		_, out, _ = popen( "cat \"%s\" | grep -A 999 '^>>> %s' | tail -n +2 | grep -B 999 '^<<< %s' | head -n -1 " % ( script_stdout, tz, tz) )
-		print ( tz, out )
+		#print ( tz, out )
 		if out.strip() == "":
 			msgs.append( "%s [OK]" % (tz) )
 		else:
-			msgs.append( "%s [Failed]" % (tz) )
+			pass #msgs.append( "%s [Failed]" % (tz) )
 
 	LCD = tempfile.tempdir
 	RCD = old_rcd
@@ -910,6 +915,7 @@ def do_load_settings(path=None):
 	global FTP_PUSH
 	global USE_HOOK
 	global FOR_MERGE
+	global BR_MASTER
 	global EXCLUDES
 	global SETTINGS_FILE
 	config = None
@@ -977,7 +983,7 @@ def do_load_settings(path=None):
 			the_value = config.get( section , option ).strip()
 			if the_value != "":
 				return the_value
-			else
+			else:
 				return default
 		return default
 
@@ -985,11 +991,13 @@ def do_load_settings(path=None):
 	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
 	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
 	FOR_MERGE = _get_string_value( 'vcseedftp', 'FOR_MERGE', "for_merge" )
+	BR_MASTER = _get_string_value( 'vcseedftp', 'BR_MASTER', "master" )
 
 	log.info("FIND_TZ  : %s" % FIND_TZ)
 	log.info("FTP_PUSH : %s" % FTP_PUSH)
 	log.info("USE_HOOK : %s" % USE_HOOK)
 	log.info("FOR_MERGE: %s" % FOR_MERGE)
+	log.info("BR_MASTER: %s" % BR_MASTER)
 	log.info("HOST     : %s" % HOST)
 	log.info("USER     : %s" % USER)
 	log.info("PASS     : %s" % PASS)
@@ -1007,6 +1015,8 @@ def do_load_settings(path=None):
 # 需先 do_load_settings()
 #
 def main():
+	global USE_HOOK
+	global BR_MASTER
 	ret = do_vcs_check()
 	if ret == 1:
 		log.error("本地端目錄存取有誤: %s" % LCD)
@@ -1018,12 +1028,12 @@ def main():
 		do_ftp_detect_timezone()
 
 	do_vcs_setup_hook( enable=USE_HOOK ) # 每次都執行
-	do_vcs_goto_branch( "master" )
+	do_vcs_goto_branch( BR_MASTER )
 	do_ftp_download()
 	do_vcs_commit()
 
 	if FTP_PUSH and check_vcs_incomming():
-		old_rev = get_hash_from_branch( "master" )
+		old_rev = get_hash_from_branch( BR_MASTER )
 		log.info( "進行 merge ..." )
 		ret = do_vcs_merge()
 		if ret:
@@ -1031,7 +1041,7 @@ def main():
 			log.info( "Merged patch List:\n%s" % msg_patch_info )
 			log.info( "Merge 成功，進行 ftp uploading ..." )
 			#do_ftp_upload()
-			new_rev = get_hash_from_branch( "master" )
+			new_rev = get_hash_from_branch( BR_MASTER )
 			cmd =  "git diff --name-status %s %s" % ( old_rev, new_rev )
 			_, diff_output, _ = popen(cmd)
 			do_ftp_upload2( diff_output )
