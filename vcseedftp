@@ -972,13 +972,19 @@ def do_load_settings(path=None):
 				return True
 		return False
 
+	def _get_string_value(section, option, default ):
+		if config.has_section( section ) and config.has_option( section , option ):
+			the_value = config.get( section , option ).strip()
+			if the_value != "":
+				return the_value
+			else
+				return default
+		return default
+
 	FIND_TZ  = _get_bool_value( 'vcseedftp', 'FIND_TZ' )
 	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
 	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
-	if config.has_option( 'vcseedftp', 'FOR_MERGE' ):
-		FOR_MERGE = config.get('vcseedftp', 'FOR_MERGE').strip()
-	if FOR_MERGE == "":
-		FOR_MERGE = "for_merge" # 預設使用 "for_merge" 為 branch 名稱
+	FOR_MERGE = _get_string_value( 'vcseedftp', 'FOR_MERGE', "for_merge" )
 
 	log.info("FIND_TZ  : %s" % FIND_TZ)
 	log.info("FTP_PUSH : %s" % FTP_PUSH)
