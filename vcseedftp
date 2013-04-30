@@ -58,6 +58,7 @@ FTP_PUSH = False
 USE_HOOK = False
 FOR_MERGE = ""
 BR_MASTER = ""
+SRC_REPO = ""
 EXCLUDES = ""
 
 # Logger fallback for module usage.
@@ -420,6 +421,20 @@ def do_vcs_check():
 	else:
 		return 3
 
+
+## 檢查是否有 branch
+#
+#  檢查是否有某個名稱的 branch
+#
+def do_vcs_has_branch( br_name ):
+	cmd = "git branch -a | grep -e  \" %s$\" " % ( br_name )
+	retcode, out, err = popen(cmd)
+	if retcode == 0:
+		hash_intersect = out.strip()
+		return True
+	else:
+		return False
+
 ## 初始化 Git repository
 #
 #  初始化 git repository 和建立 `for_merge` branch
@@ -433,6 +448,38 @@ def do_vcs_init():
 	cmd += "git branch -m %s; " % ( BR_MASTER )
 	cmd += "git branch %s %s; " % ( FOR_MERGE, BR_MASTER )
 	popen(cmd)
+
+## 初始化 Git repository (從另一個 repos)
+#
+#  從另一個 repository 來源來建立 repository
+#
+def do_vcs_init2():
+	global BR_MASTER
+	global SRC_REPO
+
+	if SRC_REPO != None:
+		cmd = "git clone -s %s . ;" % ( SRC_REPO )
+		cmd += "git checkout remotes/origin/HEAD;"
+		cmd += "git branch | grep -v 'no branch'| xargs git branch -d ;"
+		popen(cmd)
+
+		remote_master    = "remotes/origin/%s" % ( BR_MASTER )		
+		local_master     = "%s" % ( BR_MASTER )		
+
+		if do_vcs_has_branch( remote_master ):
+			# 如果 src repos 有對應的 branch, 就繼承既有的
+			cmd = "git checkout -b %s %s;" % ( local_master, remote_master )
+			popen(cmd)
+		else:
+			# 若 src repos 沒有對應的 branch, 就新增一個
+			cmd =  ""
+			cmd += "touch .gitignore; "
+			cmd += "git add --all; "
+			cmd += "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m init; "
+			cmd += "git branch -m %s; " % ( BR_MASTER )
+			cmd += "git push origin %s:%s; " % ( BR_MASTER, BR_MASTER )
+			popen(cmd)
+
 
 ## 建立或移除 push2upload hook script
 #
@@ -469,9 +516,16 @@ def do_vcs_setup_hook(enable=True):
 # 註: 若沒有變動，則不會產生新版本
 #
 def do_vcs_commit():
+	global SRC_REPO
 	cmd = "git add --all; "
 	cmd += "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m \"*\" "
 	popen(cmd)
+
+	if SRC_REPO != None:
+		# 將 commit 反饋到  source repos
+		cmd = "git fetch; git push; git fetch"
+		popen(cmd)
+		
 
 ## 檢查是否曾經 merge 失敗過
 #
@@ -916,6 +970,7 @@ def do_load_settings(path=None):
 	global USE_HOOK
 	global FOR_MERGE
 	global BR_MASTER
+	global SRC_REPO
 	global EXCLUDES
 	global SETTINGS_FILE
 	config = None
@@ -992,6 +1047,11 @@ def do_load_settings(path=None):
 	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
 	FOR_MERGE = _get_string_value( 'vcseedftp', 'FOR_MERGE', "for_merge" )
 	BR_MASTER = _get_string_value( 'vcseedftp', 'BR_MASTER', "master" )
+	SRC_REPO  = _get_string_value( 'vcseedftp', 'SRC_REPO', None )
+
+	# 若是 src repos 模式的話，則用 remote 端的 for_merge
+	if SRC_REPO != None:
+		FOR_MERGE = "remotes/origin/" + FOR_MERGE
 
 	log.info("FIND_TZ  : %s" % FIND_TZ)
 	log.info("FTP_PUSH : %s" % FTP_PUSH)
@@ -1017,12 +1077,16 @@ def do_load_settings(path=None):
 def main():
 	global USE_HOOK
 	global BR_MASTER
+	global SRC_REPO
 	ret = do_vcs_check()
 	if ret == 1:
 		log.error("本地端目錄存取有誤: %s" % LCD)
 		exit()
 	elif ret == 2:
-		do_vcs_init()
+		if SRC_REPO != None:
+			do_vcs_init2()
+		else:
+			do_vcs_init()
 
 	if FIND_TZ:
 		do_ftp_detect_timezone()
