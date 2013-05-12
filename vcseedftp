@@ -313,6 +313,27 @@ def do_vcs_merge():
 	else:
 		return True
 
+def do_vcs_untrack_ignores():
+	"""untrack ignore files"""
+
+	has_error = False
+
+	cmd = "git ls-files --exclude-standard --ignored -z | xargs -0 git rm --cached --ignore-unmatch"
+	retcode, out, err = popen(cmd)
+	if retcode != 0:
+		has_error = True
+		print( err )
+
+	cmd = "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m \"* untrack ignored files\" "
+	retcode, out, err = popen(cmd)
+	if retcode != 0:
+		has_error = True
+		print( err )
+
+	if has_error:
+		cmd = "git reset --hard"
+		retcode, out, err = popen(cmd)
+
 def do_ftp_upload():
 	script_file = tempfile.mktemp()
 	script_stdout = script_file + ".log"
@@ -637,6 +658,8 @@ def main():
 		else:
 			print( "恢復資料中..." )
 			do_vcs_reset()
+	else:
+		do_vcs_untrack_ignores()
 
 if __name__ == "__main__":
 	conf_path = do_load_settings()
