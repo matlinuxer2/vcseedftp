@@ -1,5 +1,6 @@
 run:
 	cp ../vcseedftp ./vcseedftp.py
+	make test04
 	make test03
 	make test02
 	make test01
@@ -20,3 +21,8 @@ test03:
 	( which python  && python --version  && python  ./test03_ls_octal_name.py ) || true
 	( which python2 && python2 --version && python2 ./test03_ls_octal_name.py ) || true
 	( which python3 && python3 --version && python3 ./test03_ls_octal_name.py ) || true
+
+test04:
+	( which python  && python --version  && python  ./test04_ignore_filter.py ) || true
+	( which python2 && python2 --version && python2 ./test04_ignore_filter.py ) || true
+	( which python3 && python3 --version && python3 ./test04_ignore_filter.py ) || true
