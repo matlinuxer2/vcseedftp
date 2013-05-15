@@ -30,6 +30,8 @@ SELF = os.path.realpath( __file__ )
 ROOT = os.path.dirname( SELF )
 SETTINGS_FILE = None
 TIMEZONE = os.getenv('TZ', default="")
+HOME_DIR = os.getenv('HOME')
+TZ_DATA_FILE = os.path.join( HOME_DIR, '.config', 'vcseedftp', 'timezone.dat' )
 
 HOST     = ""
 USER     = ""
@@ -37,6 +39,7 @@ PASS     = ""
 LCD      = ""
 RCD      = ""
 EXCL     = []
+FIND_TZ  = False
 FTP_PUSH = False
 USE_HOOK = False
 EXCLUDES = ""
@@ -46,12 +49,26 @@ EXCLUDES = ""
 #
 # 檢查是否是 python3
 #
-def isPython3():
+def is_python3():
 	major_version = sys.version_info[0]
 	if major_version == 3:
 		return True
 	else:
 		return False
+
+## 列出系統預設的 timezone 清單
+#
+# 列出系統預設的 timezone 清單
+#
+def listTimezones():
+	zoneinfo_path = "/usr/share/zoneinfo"
+	retcode, out, err = popen( "cd %s; find Etc -type f " % zoneinfo_path )
+	result = []
+	for item in out.split('\n'):
+		item_str = item.strip()
+		if item_str != "":
+			result.append( item_str )
+	return result
 
 ## 執行系統指令
 #
@@ -65,13 +82,11 @@ def popen(cmd):
 	pipe = subprocess.Popen([ cmd ], shell=True, cwd=LCD, stdout = subprocess.PIPE, stderr = subprocess.PIPE )
 	(out, err) = pipe.communicate()
 
-	## for python3
-	if type( out ) == type( b"bytes" ):
-		out = str(out)
-
-	## for python3
-	if type( err ) == type( b"bytes" ):
-		err = str(err)
+	if is_python3():
+		# convert bytes to str in python3
+		out, err = map(lambda s: s.decode(errors='replace'), (out, err))
+	else:
+		out, err = map(str, (out, err))
 
 	return pipe.wait(), out, err
 
@@ -82,6 +97,34 @@ def file2string(path):
 def string2file(string, path):
 	with open(path, 'w') as f:
 		f.write(string)
+
+def get_decode_string_py3(py3_str):
+	"""decode octal string that contain multibyte charactor
+
+	>>> s = b'D\t"images/\\351\\246\\226\\351\\240\\201_08.jpg"\n'
+	>>> m.get_decode_string_py3(s.decode())
+	'D\t"images/首頁_08.jpg"\n'
+	"""
+	i, b, w = 0, 0, bytearray()
+	for c in py3_str:
+		if c == '\\':
+			i = 3
+		elif i <=3 and i > 0: # in literal
+			b = int(c,8)
+			if   i == 3 and b < 4:
+				pass
+			elif i == 2:
+				b = b + w.pop() * 8
+			elif i == 1:
+				b = b + w.pop() * 8
+			else:
+				raise RuntimeError("Not octal")
+			w.append(b)
+			i = i - 1
+		else:
+			w.append(ord(c))
+
+	return w.decode('utf-8','replace')
 
 ## 檢查是否已有相同的程式在執行
 #
@@ -123,8 +166,8 @@ def do_ftp_download():
 			debug 2
 			set ftp:list-options -a;
 			set ftp:ssl-allow no;
-			#set ftp:use-mdtm no
-			#set ftp:timezone %s
+			set ftp:use-mdtm no
+			set ftp:timezone %s
 			set net:timeout 10
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
@@ -343,8 +386,8 @@ def do_ftp_upload():
 			debug 2
 			set ftp:list-options -a;
 			set ftp:ssl-allow no;
-			#set ftp:use-mdtm no
-			#set ftp:timezone %s
+			set ftp:use-mdtm no
+			set ftp:timezone %s
 			set net:timeout 10
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
@@ -390,17 +433,19 @@ def do_ftp_upload():
 #
 def convert_diff_to_ftp_commands( diff_output ):
 	result = []
+	is_py3 = is_python3()
+
+	if is_py3:
+		diff_output = get_decode_string_py3(diff_output)
+	else:
+		diff_output = diff_output.decode('string_escape')
 
 	for line in diff_output.strip().split('\n'):
 		tag      = line.split("\t")[0]
 		filename = line.split("\t")[1]
 
 		if filename[0] == "\"" and filename[-1:] == "\"":
-			if isPython3():
-				## @todo python3 的輸出結果跟 python2 不一樣，待解的懸案
-				filename = bytes( filename[1:-1], 'utf-8').decode('unicode_escape')
-			else:
-				filename = filename[1:-1].decode('string_escape')
+				filename = filename[1:-1]
 
 		if tag == "A" or tag == "M":
 			result.append( "mput -d '%s' " % ( filename ) ) # use mput to create leading directory smartly
@@ -413,15 +458,20 @@ def convert_diff_to_ftp_commands( diff_output ):
 
 	return output
 
-def do_ftp_upload2( old_rev, new_rev ):
+## 將指定的差異部份，由本地端的目錄上傳至 ftp server 上的遠端目錄
+#
+# 這函式會讀取並分析 git diff --name-status 的格式，針對差異的部份作 ftp 上傳的動作。是很酷的功能。
+# 註: 若遠端目錄，沒有對應的 parent 目錄，會自動建立對應的 parent 目錄
+#
+# @param	diff_output	字串，用來輸入 git diff --name-status 的輸出內容
+# @param	ext		額外的 lftp 指令
+#
+def do_ftp_upload2( diff_output, ext=None ):
 	script_file = tempfile.mktemp()
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
-	cmd =  "git diff --name-status %s %s" % ( old_rev, new_rev )
-	retcode, out, err = popen(cmd)
-
-	upload_commands_text = convert_diff_to_ftp_commands( out )
+	upload_commands_text = convert_diff_to_ftp_commands( diff_output )
 
 	script_tmpl = textwrap.dedent("""\
 			debug 2
@@ -438,6 +488,9 @@ def do_ftp_upload2( old_rev, new_rev ):
 			cd %s  || exit;
 			""")
 	script_tmpl += upload_commands_text
+	if ext != None:
+		script_tmpl += "\n"
+		script_tmpl += ext
 
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD )
 	string2file( script_txt, script_file )
@@ -450,10 +503,10 @@ def do_ftp_upload2( old_rev, new_rev ):
 
 	retcode = proc.wait()
 
-	cmd = "echo ==== %s ==== ; cat %s " % ( script_stdout, script_stdout )
+	cmd = "echo ==== %s ==== ; cat \"%s\" " % ( script_stdout, script_stdout )
 	_, result, _ = popen(cmd)
 	print( result )
-	cmd = "echo ==== %s ==== ; cat %s | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
+	cmd = "echo ==== %s ==== ; cat \"%s\" | grep -v '^Mirroring' " % ( script_stderr, script_stderr )
 	_, result, _ = popen(cmd)
 	print( result )
 
@@ -484,8 +537,8 @@ def do_ftp_sync_check():
 			open ftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
-			mirror --ignore-time --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
-			mirror --ignore-time --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
+			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
+			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
 			""")
 
 	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
@@ -513,7 +566,134 @@ def do_ftp_sync_check():
 
 	return result
 
+## 偵測某 ftp server 的時區設定
+#
+# 不同的 ftp server 會有不同的 timezone 設定，這會影響到 ftp 上下傳的時間正確性及比對的速度。
+# 註: 目前來用偵測的時區列表，是以 Linux 為主的時間列表
+#
+def do_ftp_detect_timezone():
+	global LCD, RCD, TIMEZONE
 
+	old_lcd, old_rcd, old_timezone = LCD, RCD, TIMEZONE
+
+	tmp_dir   = tempfile.mkdtemp()
+	tmp_file  = tempfile.mkstemp( dir = tmp_dir )
+	test_dir  = os.path.basename( tmp_dir )
+	test_file = os.path.basename( tmp_file[1] )
+
+	LCD = tempfile.tempdir
+	RCD = old_rcd
+	diff_out = "A	%s/%s" % ( test_dir, test_file )
+	do_ftp_upload2( diff_out )
+
+
+	LCD = tmp_dir
+	RCD = os.path.join( RCD, test_dir )
+	TZs = listTimezones()
+	ext_txt = ""
+	for tz in TZs:
+		ext_txt += textwrap.dedent( """\
+			echo '>>> %s '
+			set ftp:timezone %s
+			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5;
+			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5;
+			echo '<<< %s '
+			""") % ( tz, tz, tz )
+
+	script_file = tempfile.mktemp()
+	script_stdout = script_file + ".log"
+	script_stderr = script_file + ".err"
+	script_tmpl = textwrap.dedent("""\
+			debug 2
+			set ftp:list-options -a;
+			set ftp:ssl-allow no;
+			set ftp:use-mdtm no
+			set ftp:timezone %s
+			set net:timeout 10
+			set net:max-retries 2
+			set net:reconnect-interval-base 5
+			set net:reconnect-interval-multiplier 1
+			open ftp://%s:%s@%s || exit;
+			lcd %s || exit;
+			cd %s  || exit;
+			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
+			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
+			""")
+
+	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
+	script_txt += ext_txt
+	string2file( script_txt, script_file )
+
+	cmd = "lftp -f %s" % ( script_file )
+	proc = subprocess.Popen([ cmd ], shell=True, stdout=open( script_stdout, "w+"), stderr=open( script_stderr, "w+") )
+
+	print(cmd)
+	print(script_txt)
+
+	retcode = proc.wait()
+	print("return code: %s" % retcode)
+
+	result = None
+	for tz in TZs:
+		_, out, _ = popen( "cat \"%s\" | grep -A 999 '^>>> %s' | tail -n +2 | grep -B 999 '^<<< %s' | head -n -1 " % ( script_stdout, tz, tz) )
+		if out.strip() == "":
+			result = tz
+		else:
+			pass
+
+	LCD = tempfile.tempdir
+	RCD = old_rcd
+	diff_out =  "D	%s/%s" % ( test_dir, test_file )
+	ext_out  =  "rmdir '%s'" % ( test_dir )
+	do_ftp_upload2( diff_out, ext=ext_out )
+
+	# 還原 LCD, RCD, TIMEZONE 的原始設定
+	LCD, RCD, TIMEZONE = old_lcd, old_rcd, old_timezone
+
+	os.unlink( tmp_file[1] )
+	os.rmdir( tmp_dir )
+
+	return result
+
+## 查詢並取得 ftp timezone 偵測結果
+#
+# @param  host   對應的 ftp server
+# @retval string 對應的 timezone
+#
+def read_ftp_detected_timezone( host ):
+	global TZ_DATA_FILE
+
+	ret_data = None
+	if os.access( TZ_DATA_FILE, os.F_OK ) != True:
+		cmd = "install -D /dev/null %s " % ( TZ_DATA_FILE )
+		retcode, out, err = popen( cmd )
+
+	cmd = "cat %s | grep -e \"^%s\t\" | awk '{print $2}' " % ( TZ_DATA_FILE, host )
+	retcode, out, err = popen( cmd )
+
+	if out.strip() != "":
+		ret_data = out
+	
+	return ret_data
+
+## 儲存 ftp timezone 偵測結果
+#
+# @param  host     對應的 ftp server
+# @param  timezone 對應的 ftp server
+#
+def write_ftp_detected_timezone( host, timezone ):
+	global TZ_DATA_FILE
+	
+	old_tz = read_ftp_detected_timezone( host )
+	if old_tz != None:
+		cmd = "sed -e \"/^%s\t/d\" -i %s " % ( TZ_DATA_FILE )
+		retcode, out, err = popen( cmd )
+
+	cmd = "echo \"%s\t%s\" >> %s " % ( host, timezone, TZ_DATA_FILE )
+	retcode, out, err = popen( cmd )
+
+
+	
 ## 設定載入
 #
 # 設定檔載入功能會依照順序檢查：
@@ -535,6 +715,7 @@ def do_load_settings(path=None):
 	global LCD
 	global RCD
 	global EXCL
+	global FIND_TZ
 	global FTP_PUSH
 	global USE_HOOK
 	global EXCLUDES
@@ -605,9 +786,11 @@ def do_load_settings(path=None):
 				return True
 		return False
 
+	FIND_TZ  = _get_bool_value( 'vcseedftp', 'FIND_TZ' )
 	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
 	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
 
+	print("FIND_TZ  : %s" % FIND_TZ)
 	print("FTP_PUSH : %s" % FTP_PUSH)
 	print("USE_HOOK : %s" % USE_HOOK)
 	print("HOST     : %s" % HOST)
@@ -625,12 +808,34 @@ def do_load_settings(path=None):
 # 需先 do_load_settings()
 #
 def main():
+	global TIMEZONE 
+
 	ret = do_vcs_check()
 	if ret == 1:
 		print("本地端目錄存取有誤: %s" % LCD)
 		exit()
 	elif ret == 2:
 		do_vcs_init()
+
+	if FIND_TZ:
+		print("使用時區自動偵測功能")
+		ftp_tz = read_ftp_detected_timezone( HOST )
+		if ftp_tz == None:
+			print("尚未有偵測紀錄，進行時區偵測ing host=%s" % (HOST) )
+			ftp_tz = do_ftp_detect_timezone()
+			if ftp_tz != None:
+				print("偵測的時區為 %s" % (ftp_tz) )
+				write_ftp_detected_timezone( HOST, ftp_tz )
+		else:
+			print("已有偵測紀錄為 %s" % (ftp_tz) )
+
+		if ftp_tz != None:
+			print("設定時區為 %s" % (ftp_tz) )
+			TIMEZONE = ftp_tz
+		else:
+			print("找不到時區設定" )
+			exit()
+			
 
 	do_vcs_setup_hook( enable=USE_HOOK ) # 每次都執行
 	do_vcs_goto_branch( "master" )
@@ -647,7 +852,9 @@ def main():
 			print ( "Merge 成功，進行 ftp uploading ..." )
 			#do_ftp_upload()
 			new_rev = get_hash_from_branch( "master" )
-			do_ftp_upload2( old_rev, new_rev )
+			cmd =  "git diff --name-status %s %s" % ( old_rev, new_rev )
+			_, diff_output, _ = popen(cmd)
+			do_ftp_upload2( diff_output )
 			print ( "檢查 local 跟 remote ftp 的檔案是否一致" )
 
 			ret = do_ftp_sync_check()
