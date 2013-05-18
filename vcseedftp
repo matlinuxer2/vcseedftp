@@ -318,7 +318,8 @@ def do_vcs_untrack_ignores():
 
 	has_error = False
 
-	cmd = "git ls-files --exclude-standard --ignored -z | xargs -0 git rm --cached --ignore-unmatch"
+	## @todo 注意!! gitignore 的規則，在 git 1.7.x 跟 1.8.x 之間有差異，所以執行效果會有差異
+	cmd = "git ls-files --exclude-standard --ignored -z | xargs -0 git rm --cached --ignore-unmatch -- "
 	retcode, out, err = popen(cmd)
 	if retcode != 0:
 		has_error = True
