@@ -738,6 +738,21 @@ def write_ftp_detected_timezone( host, timezone ):
 #
 def do_load_settings(path=None):
 
+	def _get_bool_value(section, option):
+		if config.has_section( section ) and config.has_option( section , option ):
+			ftp_push_str = config.get( section , option ).strip().lower()
+			if ftp_push_str in ['yes', 'true', 'enable', 'on']:
+				return True
+		return False
+
+	def _get_str_value(section, option, default):
+		result = default
+
+		if config.has_section( section ) and config.has_option( section , option ):
+			result = config.get( section , option ).strip()
+
+		return result
+
 	global SFTP
 	global HOST
 	global USER
@@ -791,14 +806,8 @@ def do_load_settings(path=None):
 	PASS     = config.get('lftp', 'PASS')
 	LCD      = config.get('lftp', 'LCD')
 	RCD      = config.get('lftp', 'RCD')
-	TIMEOUT  = config.get('lftp', 'TIMEOUT')
-	PARALLEL = config.get('lftp', 'PARALLEL')
-
-	if TIMEOUT == "":
-		TIMEOUT = "10"
-
-	if PARALLEL == "":
-		PARALLEL = "3"
+	TIMEOUT  = _get_str_value('lftp', 'TIMEOUT', "10" )
+	PARALLEL = _get_str_value('lftp', 'PARALLEL', "3" )
 
 	if config.has_option( 'lftp', 'EXCL' ):
 		EXCL = config.get('lftp', 'EXCL').split('\n')
@@ -819,13 +828,6 @@ def do_load_settings(path=None):
 			EXCL[i] = "--exclude "+EXCL[i]
 
 	EXCLUDES = " ".join( EXCL )
-
-	def _get_bool_value(section, option):
-		if config.has_section( section ) and config.has_option( section , option ):
-			ftp_push_str = config.get( section , option ).strip().lower()
-			if ftp_push_str in ['yes', 'true', 'enable', 'on']:
-				return True
-		return False
 
 	FIND_TZ  = _get_bool_value( 'vcseedftp', 'FIND_TZ' )
 	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
