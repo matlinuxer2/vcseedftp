@@ -33,6 +33,7 @@ TIMEZONE = os.getenv('TZ', default="")
 HOME_DIR = os.getenv('HOME')
 TZ_DATA_FILE = os.path.join( HOME_DIR, '.config', 'vcseedftp', 'timezone.dat' )
 
+SFTP     = ""
 HOST     = ""
 USER     = ""
 PASS     = ""
@@ -172,13 +173,13 @@ def do_ftp_download():
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
-			open ftp://%s:%s@%s || exit;
+			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
 			mirror --delete --verbose --parallel=3 %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES )
+	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -392,13 +393,13 @@ def do_ftp_upload():
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
-			open ftp://%s:%s@%s || exit;
+			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
 			mirror --reverse --dry-run --delete --verbose=3 --parallel=3 %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES )
+	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -483,7 +484,7 @@ def do_ftp_upload2( diff_output, ext=None ):
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
-			open ftp://%s:%s@%s || exit;
+			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
 			""")
@@ -492,7 +493,7 @@ def do_ftp_upload2( diff_output, ext=None ):
 		script_tmpl += "\n"
 		script_tmpl += ext
 
-	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD )
+	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -534,14 +535,14 @@ def do_ftp_sync_check():
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
-			open ftp://%s:%s@%s || exit;
+			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
 			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
 			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
+	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -613,14 +614,14 @@ def do_ftp_detect_timezone():
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
-			open ftp://%s:%s@%s || exit;
+			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
 			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
 			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
+	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
 	script_txt += ext_txt
 	string2file( script_txt, script_file )
 
@@ -709,6 +710,7 @@ def write_ftp_detected_timezone( host, timezone ):
 #
 def do_load_settings(path=None):
 
+	global SFTP
 	global HOST
 	global USER
 	global PASS
@@ -718,6 +720,7 @@ def do_load_settings(path=None):
 	global FIND_TZ
 	global FTP_PUSH
 	global USE_HOOK
+	global USE_SFTP
 	global EXCLUDES
 	global SETTINGS_FILE
 	config = None
@@ -789,10 +792,18 @@ def do_load_settings(path=None):
 	FIND_TZ  = _get_bool_value( 'vcseedftp', 'FIND_TZ' )
 	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
 	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
+	USE_SFTP = _get_bool_value( 'lftp'     , 'USE_SFTP' )
+
+	if USE_SFTP == True:
+		SFTP = "s"
+	else:
+		SFTP = ""
 
 	print("FIND_TZ  : %s" % FIND_TZ)
 	print("FTP_PUSH : %s" % FTP_PUSH)
 	print("USE_HOOK : %s" % USE_HOOK)
+	print("USE_SFTP : %s" % USE_SFTP)
+	print("SFTP     : %s" % SFTP)
 	print("HOST     : %s" % HOST)
 	print("USER     : %s" % USER)
 	print("PASS     : %s" % PASS)
