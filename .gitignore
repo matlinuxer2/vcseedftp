@@ -1,3 +1,5 @@
 *.ini
-docs/
-logs/
+/dist/
+/docs/
+/logs/
+/vcseedftp.egg-info/

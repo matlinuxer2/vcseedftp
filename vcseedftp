@@ -53,6 +53,8 @@ USER     = ""
 PASS     = ""
 LCD      = ""
 RCD      = ""
+TIMEOUT  = ""
+PARALLEL = ""
 EXCL     = []
 FIND_TZ  = False
 FTP_PUSH = False
@@ -347,23 +349,28 @@ def do_ftp_download():
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
+	if SFTP == "s":
+		ssl_setup_txt = "set ftp:ssl-allow yes;"
+	else:
+		ssl_setup_txt = "set ftp:ssl-allow no;"
+
 	script_tmpl = textwrap.dedent("""\
 			debug 2
 			set ftp:list-options -a;
-			set ftp:ssl-allow no;
+			%s
 			set ftp:use-mdtm no
 			set ftp:timezone %s
-			set net:timeout 10
+			set net:timeout %s
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
 			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
-			mirror --delete --verbose --parallel=3 %s ;
+			mirror --delete --verbose --parallel=%s %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES )
+	script_txt = script_tmpl % ( ssl_setup_txt, TIMEZONE, TIMEOUT, SFTP, USER, PASS, HOST, LCD, RCD, PARALLEL, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -693,23 +700,28 @@ def do_ftp_upload():
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
+	if SFTP == "s":
+		ssl_setup_txt = "set ftp:ssl-allow yes;"
+	else:
+		ssl_setup_txt = "set ftp:ssl-allow no;"
+
 	script_tmpl = textwrap.dedent("""\
 			debug 2
 			set ftp:list-options -a;
-			set ftp:ssl-allow no;
+			%s
 			set ftp:use-mdtm no
 			set ftp:timezone %s
-			set net:timeout 10
+			set net:timeout %s
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
 			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
-			mirror --reverse --dry-run --delete --verbose=3 --parallel=3 %s ;
+			mirror --reverse --dry-run --delete --verbose=3 --parallel=%s %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES )
+	script_txt = script_tmpl % ( ssl_setup_txt, TIMEZONE, TIMEOUT, SFTP, USER, PASS, HOST, LCD, RCD, PARALLEL, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -784,13 +796,18 @@ def do_ftp_upload2( diff_output, ext=None ):
 
 	upload_commands_text = convert_diff_to_ftp_commands( diff_output )
 
+	if SFTP == "s":
+		ssl_setup_txt = "set ftp:ssl-allow yes;"
+	else:
+		ssl_setup_txt = "set ftp:ssl-allow no;"
+
 	script_tmpl = textwrap.dedent("""\
 			debug 2
 			set ftp:list-options -a;
-			set ftp:ssl-allow no;
+			%s
 			#set ftp:use-mdtm no
 			#set ftp:timezone %s
-			set net:timeout 10
+			set net:timeout %s
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
@@ -803,7 +820,7 @@ def do_ftp_upload2( diff_output, ext=None ):
 		script_tmpl += "\n"
 		script_tmpl += ext
 
-	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD )
+	script_txt = script_tmpl % ( ssl_setup_txt, TIMEZONE, TIMEOUT, SFTP, USER, PASS, HOST, LCD, RCD )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -838,24 +855,29 @@ def do_ftp_sync_check():
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
+	if SFTP == "s":
+		ssl_setup_txt = "set ftp:ssl-allow yes;"
+	else:
+		ssl_setup_txt = "set ftp:ssl-allow no;"
+
 	script_tmpl = textwrap.dedent("""\
 			debug 2
 			set ftp:list-options -a;
-			set ftp:ssl-allow no;
+			%s
 			set ftp:use-mdtm no
 			set ftp:timezone %s
-			set net:timeout 10
+			set net:timeout %s
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
 			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
-			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
-			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
+			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=%s %s ;
+			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=%s %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
+	script_txt = script_tmpl % ( ssl_setup_txt, TIMEZONE, TIMEOUT, SFTP, USER, PASS, HOST, LCD, RCD, PARALLEL, EXCLUDES, PARALLEL, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -914,24 +936,30 @@ def do_ftp_detect_timezone():
 	script_file = gen_filepath_for_logs( "do_ftp_detect_timezone" )
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
+
+	if SFTP == "s":
+		ssl_setup_txt = "set ftp:ssl-allow yes;"
+	else:
+		ssl_setup_txt = "set ftp:ssl-allow no;"
+
 	script_tmpl = textwrap.dedent("""\
 			debug 2
 			set ftp:list-options -a;
-			set ftp:ssl-allow no;
+			%s
 			set ftp:use-mdtm no
 			set ftp:timezone %s
-			set net:timeout 10
+			set net:timeout %s
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
 			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
-			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
-			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
+			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=%s %s ;
+			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=%s %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
+	script_txt = script_tmpl % ( ssl_setup_txt, TIMEZONE, TIMEOUT, SFTP, USER, PASS, HOST, LCD, RCD, PARALLEL, EXCLUDES, PARALLEL, EXCLUDES )
 	script_txt += ext_txt
 	string2file( script_txt, script_file )
 
@@ -1032,6 +1060,8 @@ def do_load_settings(path=None):
 	global FTP_PUSH
 	global USE_HOOK
 	global USE_SFTP
+	global TIMEOUT
+	global PARALLEL
 	global FOR_MERGE
 	global BR_MASTER
 	global SRC_REPO
@@ -1109,6 +1139,8 @@ def do_load_settings(path=None):
 	FIND_TZ  = _get_bool_value( 'vcseedftp', 'FIND_TZ' )
 	FTP_PUSH = _get_bool_value( 'vcseedftp', 'FTP_PUSH' )
 	USE_HOOK = _get_bool_value( 'vcseedftp', 'USE_HOOK' )
+	TIMEOUT  = _get_str_value('lftp', 'TIMEOUT', "10" )
+	PARALLEL = _get_str_value('lftp', 'PARALLEL', "3" )
 	FOR_MERGE = _get_string_value( 'vcseedftp', 'FOR_MERGE', "for_merge" )
 	BR_MASTER = _get_string_value( 'vcseedftp', 'BR_MASTER', "master" )
 	SRC_REPO  = _get_string_value( 'vcseedftp', 'SRC_REPO', None )
@@ -1135,6 +1167,8 @@ def do_load_settings(path=None):
 	log.info("PASS     : %s" % PASS)
 	log.info("LCD      : %s" % LCD)
 	log.info("RCD      : %s" % RCD)
+	log.info("TIMEOUT  : %s" % TIMEOUT)
+	log.info("PARALLEL : %s" % PARALLEL)
 	log.info("EXCL     : %s" % EXCL)
 	log.info("EXCLUDES : %s" % EXCLUDES)
 
