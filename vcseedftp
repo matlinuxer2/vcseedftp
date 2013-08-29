@@ -659,6 +659,27 @@ def do_vcs_merge():
 	else:
 		return True
 
+def do_vcs_untrack_ignores():
+	"""untrack ignore files"""
+
+	has_error = False
+
+	cmd = "git ls-files --exclude-standard --ignored -z | xargs -0 git rm --cached --ignore-unmatch"
+	retcode, out, err = popen(cmd)
+	if retcode != 0:
+		has_error = True
+		print( err )
+
+	cmd = "git commit --author \"Version Control Seed for FTP <bot@vcseedftp>\" -m \"* untrack ignored files\" "
+	retcode, out, err = popen(cmd)
+	if retcode != 0:
+		has_error = True
+		print( err )
+
+	if has_error:
+		cmd = "git reset --hard"
+		retcode, out, err = popen(cmd)
+
 ## 將本地端的目錄上傳至 ftp server 上的遠端目錄
 #
 # 將本地端的目錄上傳至 ftp server 上的遠端目錄
@@ -1119,6 +1140,8 @@ def main():
 		else:
 			log.info( "恢復資料中..." )
 			do_vcs_reset()
+	else:
+		do_vcs_untrack_ignores()
 
 ## 執行檔載入執行
 #
