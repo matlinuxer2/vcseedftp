@@ -1,10 +1,13 @@
-update:
+help:  # 顯示命令列
+	@cat Makefile | grep -e '^\(\w*\):' | sed -e 's/^\(\w*\):.*#\(.*\)/make \1 \t #\2/g'
+
+update: # 更新 source code
 	git pull; git push -f ; 
 
-run:
+run: # 執行
 	ps aux | grep 'vcseedftp' | grep -v 'grep' | grep -v '/bin/sh -c cd' | grep -v 'git-upload-pack' || for ini in `find . -type f -name '*.ini' | sort `; do ./vcseedftp $$ini; done
 
-cron:
+cron: # 執行 cron 
 	git checkout master;
 	make update
 	crontab -l | sed -e '/vcseedftp/d' > cron.txt 
@@ -13,14 +16,14 @@ cron:
 	crontab -l
 	rm -v cron.txt
 
-mkdir:
+mkdir: # 快速建立 profile 中，所需的目錄(未來應收納進程式功能)
 	for x in `find . -type f -name '*.ini'| xargs grep LCD | awk '{print $$3}'`;do install -v -d $$x;done
 
-kill:
+kill: # 刪除 run 的執行
 	ps aux | grep 'make run'           | grep -v 'grep' | awk '{print $$2}' | xargs kill
 	ps aux | grep 'lftp -f /tmp/tmp'   | grep -v 'grep' | awk '{print $$2}' | xargs kill
 
-docs/Doxyfile:
+docs/Doxyfile: # 展開文件
 	( test -d docs && rm -rvf docs ) || true
 	install -d docs
 	cd docs; rm Doxyfile; doxygen -g
@@ -49,7 +52,7 @@ docs/Doxyfile:
 	#cd docs; sed -i Doxyfile -e "s/^EXTRACT_STATIC .*=.*/EXTRACT_STATIC = YES/g"
 	#cd docs; sed -i Doxyfile -e "s/^XXX .*=.*/XXX = YES/g"
 
-logs/mbox:
+logs/mbox: # 捷徑取得伺服器上的 mbox 資料(should be deprecated )
 	test -d logs || install -d logs
 	rsync -avz --rsh="ssh -p 11022" mat@219.84.143.48:mbox logs/mbox
 
@@ -66,10 +69,16 @@ doc_new:
 doc_old:
 	cd docs; cp ../vcseedftp ../vcseedftp.py; doxygen; rm ../vcseedftp.py
 
-view:
+view: # 瀏覽文件 (捷徑)
 	xdg-open ./docs/html/index.html
 	xdg-open ./logs/index.html
 
-clean:
+pkg: # 編譯 python tarball 套件
+	python setup.py sdist
+	find ./dist -type f
+
+clean: # 清除資料
 	( test -d docs && rm -rf docs ) || true
 	( test -d logs && rm -rf logs ) || true
+	( test -d dist && rm -rf dist ) || true
+	( test -d vcseedftp.egg-info/ && rm -rf vcseedftp.egg ) || true
