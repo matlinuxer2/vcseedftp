@@ -673,7 +673,8 @@ def do_vcs_untrack_ignores():
 
 	has_error = False
 
-	cmd = "git ls-files --exclude-standard --ignored -z | xargs -0 git rm --cached --ignore-unmatch"
+	## @todo 注意!! gitignore 的規則，在 git 1.7.x 跟 1.8.x 之間有差異，所以執行效果會有差異
+	cmd = "git ls-files --exclude-standard --ignored -z | xargs -0 git rm --cached --ignore-unmatch -- "
 	retcode, out, err = popen(cmd)
 	if retcode != 0:
 		has_error = True
@@ -781,6 +782,30 @@ def convert_diff_to_ftp_commands( diff_output ):
 
 	return output
 
+def is_ignored( filename ):
+	## @todo git 的 check-ignore 只有在 1.8.2 版之後才有
+	cmd =  "git check-ignore %s " % ( filename )
+	retcode, out, err = popen(cmd)
+
+	if retcode == 0:
+		return True
+	else:
+		return False
+
+def diff_ignore_filter( diff_output ):
+	result = []
+	for line in diff_output.strip().split('\n'):
+		tag      = line.split("\t")[0]
+		filename = line.split("\t")[1]
+
+		if is_ignored( filename ):
+			print( "忽略 %s " % (filename) )
+		else:
+			result.append( line )
+
+	output = "\n".join( result )
+	return output
+
 ## 將指定的差異部份，由本地端的目錄上傳至 ftp server 上的遠端目錄
 #
 # 這函式會讀取並分析 git diff --name-status 的格式，針對差異的部份作 ftp 上傳的動作。是很酷的功能。
@@ -794,6 +819,7 @@ def do_ftp_upload2( diff_output, ext=None ):
 	script_stdout = script_file + ".log"
 	script_stderr = script_file + ".err"
 
+	diff_output = diff_ignore_filter( diff_output ) # 過濾掉 .gitignore 的項目
 	upload_commands_text = convert_diff_to_ftp_commands( diff_output )
 
 	if SFTP == "s":

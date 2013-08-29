@@ -1,0 +1,22 @@
+# :% ! sort -f | uniq
+*.DS_Store
+*.orig
+*.swo
+*.swp
+*.sync_last
+*.viminfo
+*bak*
+*~
+/.git/
+/.hg/
+/Config/*.txt
+/Config/cache/
+/Config/conf.global.php
+/UnitTest/data.txt
+/UploadFile/
+/archive_out/
+/shopping/log/*.txt
+/templates/*/templates_c/
+/webscan_360_cn.html
+Thumbs.db
+error_log

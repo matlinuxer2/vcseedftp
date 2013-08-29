@@ -3,6 +3,7 @@ all:
 	make test02
 	make test03
 	make test04
+	make test05
 
 pre:
 	cp ../vcseedftp ./vcseedftp.py
@@ -37,4 +38,11 @@ test04:
 	( which python  && python --version  && python  ./test04_list_timezone.py ) || true
 	( which python2 && python2 --version && python2 ./test04_list_timezone.py ) || true
 	( which python3 && python3 --version && python3 ./test04_list_timezone.py ) || true
+	make post
+
+test05:
+	make pre
+	( which python  && python --version  && python  ./test04_ignore_filter.py ) || true
+	( which python2 && python2 --version && python2 ./test04_ignore_filter.py ) || true
+	( which python3 && python3 --version && python3 ./test04_ignore_filter.py ) || true
 	make post
