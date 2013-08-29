@@ -47,6 +47,7 @@ TIMEZONE = os.getenv('TZ', default="")
 BATCH_ID = time.time() # Timestamp
 BATCH_ID_TIME_STR = time.strftime( '%Y-%m-%d_%H:%M:%S', time.localtime( BATCH_ID ) )
 
+SFTP     = ""
 HOST     = ""
 USER     = ""
 PASS     = ""
@@ -356,13 +357,13 @@ def do_ftp_download():
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
-			open ftp://%s:%s@%s || exit;
+			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
 			mirror --delete --verbose --parallel=3 %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES )
+	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -702,13 +703,13 @@ def do_ftp_upload():
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
-			open ftp://%s:%s@%s || exit;
+			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
 			mirror --reverse --dry-run --delete --verbose=3 --parallel=3 %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES )
+	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -793,7 +794,7 @@ def do_ftp_upload2( diff_output, ext=None ):
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
-			open ftp://%s:%s@%s || exit;
+			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
 			""")
@@ -802,7 +803,7 @@ def do_ftp_upload2( diff_output, ext=None ):
 		script_tmpl += "\n"
 		script_tmpl += ext
 
-	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD )
+	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -847,14 +848,14 @@ def do_ftp_sync_check():
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
-			open ftp://%s:%s@%s || exit;
+			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
 			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
 			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
+	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -923,14 +924,14 @@ def do_ftp_detect_timezone():
 			set net:max-retries 2
 			set net:reconnect-interval-base 5
 			set net:reconnect-interval-multiplier 1
-			open ftp://%s:%s@%s || exit;
+			open %sftp://%s:%s@%s || exit;
 			lcd %s || exit;
 			cd %s  || exit;
 			mirror --no-perms --no-umask --dry-run    --delete --verbose --parallel=5 %s ;
 			mirror --no-perms --no-umask --dry-run -R --delete --verbose --parallel=5 %s ;
 			""")
 
-	script_txt = script_tmpl % ( TIMEZONE, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
+	script_txt = script_tmpl % ( TIMEZONE, SFTP, USER, PASS, HOST, LCD, RCD, EXCLUDES, EXCLUDES )
 	script_txt += ext_txt
 	string2file( script_txt, script_file )
 
@@ -1020,6 +1021,7 @@ def write_ftp_detected_timezone( host, timezone ):
 #
 def do_load_settings(path=None):
 
+	global SFTP
 	global HOST
 	global USER
 	global PASS
@@ -1029,6 +1031,7 @@ def do_load_settings(path=None):
 	global FIND_TZ
 	global FTP_PUSH
 	global USE_HOOK
+	global USE_SFTP
 	global FOR_MERGE
 	global BR_MASTER
 	global SRC_REPO
@@ -1109,6 +1112,12 @@ def do_load_settings(path=None):
 	FOR_MERGE = _get_string_value( 'vcseedftp', 'FOR_MERGE', "for_merge" )
 	BR_MASTER = _get_string_value( 'vcseedftp', 'BR_MASTER', "master" )
 	SRC_REPO  = _get_string_value( 'vcseedftp', 'SRC_REPO', None )
+	USE_SFTP = _get_bool_value( 'lftp'     , 'USE_SFTP' )
+
+	if USE_SFTP == True:
+		SFTP = "s"
+	else:
+		SFTP = ""
 
 	# 若是 src repos 模式的話，則用 remote 端的 for_merge
 	if SRC_REPO != None:
@@ -1117,6 +1126,8 @@ def do_load_settings(path=None):
 	log.info("FIND_TZ  : %s" % FIND_TZ)
 	log.info("FTP_PUSH : %s" % FTP_PUSH)
 	log.info("USE_HOOK : %s" % USE_HOOK)
+	log.info("USE_SFTP : %s" % USE_SFTP)
+	log.info("SFTP     : %s" % SFTP)
 	log.info("FOR_MERGE: %s" % FOR_MERGE)
 	log.info("BR_MASTER: %s" % BR_MASTER)
 	log.info("HOST     : %s" % HOST)
