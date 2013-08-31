@@ -215,7 +215,7 @@ def is_python3():
 #
 def listTimezones():
 	zoneinfo_path = "/usr/share/zoneinfo"
-	retcode, out, err = popen( "cd %s; find Etc -type f " % zoneinfo_path )
+	retcode, out, err = popen( "cd %s; find Etc -type f | sort " % zoneinfo_path )
 	result = []
 	for item in out.split('\n'):
 		item_str = item.strip()
@@ -841,12 +841,12 @@ def do_ftp_upload2( diff_output, ext=None ):
 			lcd %s || exit;
 			cd %s  || exit;
 			""")
-	script_tmpl += upload_commands_text
-	if ext != None:
-		script_tmpl += "\n"
-		script_tmpl += ext
 
 	script_txt = script_tmpl % ( ssl_setup_txt, TIMEZONE, TIMEOUT, SFTP, USER, PASS, HOST, LCD, RCD )
+	script_txt += upload_commands_text
+	if ext != None:
+		script_txt += "\n"
+		script_txt += ext
 	string2file( script_txt, script_file )
 
 	cmd = "lftp -f %s" % ( script_file )
@@ -1036,7 +1036,8 @@ def read_ftp_detected_timezone( host ):
 	cmd = "cat %s | grep -e \"^%s\t\" | awk '{print $2}' " % ( TZ_DATA_FILE, host )
 	retcode, out, err = popen( cmd )
 
-	if out.strip() != "":
+	out = out.strip()
+	if out != "":
 		ret_data = out
 	
 	return ret_data
