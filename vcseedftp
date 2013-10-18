@@ -1010,6 +1010,13 @@ def main():
 			print ( "檢查 local 跟 remote ftp 的檔案是否一致" )
 
 			ret = do_ftp_sync_check()
+			cnt_up = 0
+			while cnt_up < 2:
+				cnt_up += 1
+				if ret != 0:
+					do_ftp_upload2( diff_output ) # 重新上傳
+					ret = do_ftp_sync_check()
+
 			if ret == 0:
 				print ( ">>> ftp sync 狀態一致 <<<" )
 			else:
