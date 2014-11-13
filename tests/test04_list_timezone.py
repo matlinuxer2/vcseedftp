@@ -8,4 +8,7 @@ import vcseedftp
 
 vcseedftp.LCD = "/tmp/"
 
-print( vcseedftp.listTimezones() )
+result = vcseedftp.listTimezones()
+
+for itm in result:
+    print( itm )

@@ -21,6 +21,7 @@ import sqlite3
 import tempfile
 import textwrap
 import subprocess
+import hashlib
 
 try:
 	import ConfigParser
@@ -209,19 +210,45 @@ def is_python3():
 	else:
 		return False
 
+
+## 列出系統預設的 timezone 清單
+#
+# 列出系統預設的 timezone 清單
+#
+def file_chksum( full_path ):
+        return hashlib.md5(open(full_path, 'rb').read()).hexdigest()
+
+
 ## 列出系統預設的 timezone 清單
 #
 # 列出系統預設的 timezone 清單
 #
 def listTimezones():
-	zoneinfo_path = "/usr/share/zoneinfo"
-	retcode, out, err = popen( "cd %s; find Etc -type f | sort " % zoneinfo_path )
-	result = []
-	for item in out.split('\n'):
-		item_str = item.strip()
-		if item_str != "":
-			result.append( item_str )
-	return result
+    zoneinfo_path = "/usr/share/zoneinfo"
+    retcode, out, err = popen( "find %s -type f | sort " % (zoneinfo_path) )
+    chksums = []
+    result = []
+    for item in out.split('\n'):
+        item_str = item.strip()
+        if item_str != "":
+            fpath = item_str
+            chksum = file_chksum(fpath)
+            if chksum not in chksums:
+                chksums.append( chksum )
+                basename = os.path.basename(fpath)
+                dirname = os.path.basename( os.path.dirname(fpath) )
+
+                if "." in basename:
+                    continue
+
+                if os.path.dirname(fpath) == zoneinfo_path:
+                    dname = basename
+                else:
+                    dname = os.path.join( dirname, basename ) 
+
+                result.append(dname)
+
+    return result
 
 ## 執行系統指令
 #
