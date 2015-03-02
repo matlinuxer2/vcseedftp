@@ -164,7 +164,7 @@ def check_process_running( conf_name ):
 	for pid in psutil.get_pid_list():
 		try:
 			proc = psutil.Process(pid)
-			cmdline  = proc.cmdline
+			cmdline  = proc.cmdline()
 		except:
 			continue
 
@@ -1011,7 +1011,7 @@ def main():
 
 			ret = do_ftp_sync_check()
 			cnt_up = 0
-			while cnt_up < 2:
+			while cnt_up < 0:
 				cnt_up += 1
 				if ret != 0:
 					do_ftp_upload2( diff_output ) # 重新上傳
