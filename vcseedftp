@@ -161,7 +161,7 @@ def check_process_running( conf_name ):
 
 	cur_pid = os.getpid() # 自己的 pid
 
-	for pid in psutil.get_pid_list():
+	for pid in psutil.pids():
 		try:
 			proc = psutil.Process(pid)
 			cmdline  = proc.cmdline()
